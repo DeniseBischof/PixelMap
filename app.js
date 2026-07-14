@@ -1,0 +1,1059 @@
+// ================= Tileset (basic overworld, 12×(8×8), eingebettet) =================
+const BUILTIN_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAICAYAAAAGP/oPAAACu0lEQVR4nLVWQWvUQBSelP4AkVRCWEIIS5E9SClFRIInKcWDp6UHD+JJiocexIOHHnvwICIiRURkDz146EmKlCKeFlnKEkQkLGFZQgghlGXpwZPCRt60L3mZzE6j0g9m5703Sch+875vom3srmVMgSVvqlpmU3u1lB/1fXZ9pZXnHyeu8v4Xtz3lejAckzhki027FP8KeqXrvSBhy4tmnqf6LeXzNx8/1WC+v7uejQZRXu9u93j9ojEHP1E44YlxxSjNFA3LyuMoOb0eYZrFH5bVVpZtPlTQjWI9jQsiEIbZkMb83RyH1cFN1+VDhLt1gzehc9Wq1P4FJ/6D2vfO0yQ9TvMZNgFzkXDLvFzKkySpPBhr4zhi/XNeIhUINxpW9ZoklsbQ8TAoaG7qrDaoAibxz/o3Msb8djtr7e1pQP7vhZfsxGfZpVZHq7UBll0QCmqAHMmXEY6KiKOIW44IWtOdasehGvpeWCEcNgNyUMQ4DbnVUNAcYrAb0XZAEfFodPq8sxp0/tdutxLXJV9lUUC++azJfNbmpN/Z9rNPW0cl8j8f7nNVBIMBzx9tPuHrc6L9qECVAOQjwPNnDVQBgivCC3PyReBmAPkA9HyYcdBcBiQf8e37sEQ4xFBT+b3f+aHVtSjo/HsfvvBZ9j47r56XyKe1eex+7HjMUQkUoATsfNgMqgzwfLQdGgP0hlV0veQF9bNux+6fBfB+tB+M0W5EG0IcJ0O2dK3JCYcZgTW6CRurLU7Km0O/QiTt/vMsSux+kXyAPwiKQxiASpABSMfux85XnQOyM4F2PaiAHspjCfmyg1h2DoD1wLi75uYx2hG1JUo+Jb4OqEKAeBhUIbNIR6DdAOk4Xu+85TXtbz9Dxc7vjctfJCJS5+F/fYbuH6iPcHtanFUUeC4cJNUvNIr3nXc5cSoFXBT+APy6lWq47OqIAAAAAElFTkSuQmCC";
+
+// Standard-Legende (Reihenfolge = Bild). solid/canopy = Editor-Metadaten, pal = Palette-Index.
+const BUILTIN_DEFS = [
+  { ch: '.', name: 'Gras',     solid: false, canopy: false, pal: 0 },
+  { ch: ',', name: 'Erde',     solid: false, canopy: false, pal: 2 },
+  { ch: '#', name: 'Stein',    solid: true,  canopy: false, pal: 3 },
+  { ch: '~', name: 'Wasser',   solid: true,  canopy: false, pal: 1 },
+  { ch: '_', name: 'Sand',     solid: false, canopy: false, pal: 2 },
+  { ch: '=', name: 'Weg',      solid: false, canopy: false, pal: 2 },
+  { ch: 'w', name: 'Holz',     solid: false, canopy: false, pal: 4 },
+  { ch: '^', name: 'Berg',     solid: true,  canopy: false, pal: 3 },
+  { ch: 'T', name: 'Baum',     solid: true,  canopy: false, pal: 5 },
+  { ch: 'B', name: 'Busch',    solid: true,  canopy: false, pal: 5 },
+  { ch: '*', name: 'Blumen',   solid: false, canopy: false, pal: 6 },
+  { ch: 'o', name: 'Fels',     solid: true,  canopy: false, pal: 3 },
+];
+// 8 Paletten-Slots nach Funktion (Tile.pal zeigt auf einen Slot 0..7), je 4 Farben hell→dunkel.
+const PAL_SLOTS = ['Gras', 'Wasser', 'Erde', 'Stein', 'Holz', 'Laub', 'Blüten', 'Neutral'];
+// Beliebte Farbpaletten-Presets zum Auswählen (füllen die 8 Slots).
+const PALETTE_PRESETS = [
+  { name: 'Warm Cartridge', pals: [
+    ['#e6ffe6','#96e68c','#3ca050','#123a17'], ['#cfeaff','#79bdf0','#356fbe','#132a4e'],
+    ['#f3e2b8','#d9b26a','#9c6a2e','#4a2f12'], ['#eceae0','#a9a79a','#5f5e52','#232219'],
+    ['#e6c79c','#b3823f','#71441f','#2c190b'], ['#bfe39a','#5fa03f','#2f6b28','#123a12'],
+    ['#ffd9e6','#ff8fb0','#d24a72','#6f1f3a'], ['#f0efe6','#b6b6a5','#6b6b5b','#242419'] ] },
+  { name: 'Nature', pals: [
+    ['#cde6a5','#8fbf5a','#4f8f3a','#274d20'], ['#bfe3f0','#6fb6d8','#2f74a6','#123a55'],
+    ['#e4cfa0','#c39a5e','#8a5f30','#432c15'], ['#dcdcd4','#a7a79c','#6e6e63','#2c2c25'],
+    ['#d9b183','#a9743c','#6f4520','#2f1d0e'], ['#a7cf7a','#5a9440','#356b28','#173a15'],
+    ['#f3d6df','#e78fa6','#c14f6c','#6f2438'], ['#eeeee6','#b3b3a6','#6d6d60','#26261d'] ] },
+  { name: 'Pastell (Sweetie-16)', pals: [
+    ['#a7f070','#38b764','#257179','#1a1c2c'], ['#73eff7','#41a6f6','#3b5dc9','#29366f'],
+    ['#ffcd75','#ef7d57','#b13e53','#5d275d'], ['#f4f4f4','#94b0c2','#566c86','#333c57'],
+    ['#ffcd75','#c98a4b','#8a5a2c','#3a2416'], ['#a7f070','#38b764','#1e6b3a','#123a1e'],
+    ['#ffd9e6','#ff9ec4','#b13e53','#5d275d'], ['#f4f4f4','#94b0c2','#566c86','#1a1c2c'] ] },
+  { name: 'PICO-8', pals: [
+    ['#00e436','#008751','#1d2b53','#000000'], ['#fff1e8','#29adff','#1d2b53','#000000'],
+    ['#fff1e8','#ffccaa','#ffa300','#ab5236'], ['#fff1e8','#c2c3c7','#5f574f','#000000'],
+    ['#ffccaa','#ab5236','#5f574f','#000000'], ['#00e436','#008751','#1d2b53','#000000'],
+    ['#ff77a8','#ff004d','#7e2553','#1d2b53'], ['#fff1e8','#c2c3c7','#5f574f','#000000'] ] },
+  // Beliebte 4-Farben-Paletten (Lospec) — je Slot dieselbe Rampe (monochrom-thematisch)
+  { name: 'Game Boy (DMG)',   pals: Array(8).fill(['#9bbc0f','#77a112','#3b6a20','#0f380f']) },
+  { name: 'Kirokaze GB',      pals: Array(8).fill(['#e2f3e4','#94e344','#46878f','#332c50']) },
+  { name: 'Ice Cream GB',     pals: Array(8).fill(['#fff6d3','#f9a875','#eb6b6f','#7c3f58']) },
+  { name: 'Mist GB',          pals: Array(8).fill(['#c4f0c2','#5ab9a8','#1e606e','#2d1b00']) },
+  { name: 'Rustic GB',        pals: Array(8).fill(['#edb4a1','#a86868','#764462','#2c2137']) },
+  { name: 'Spacehaze GB',     pals: Array(8).fill(['#f8e3c4','#cc3495','#6b1fb1','#0b0630']) },
+  { name: 'Hollow',           pals: Array(8).fill(['#fafbf6','#c6b7be','#565a75','#0f0f1b']) },
+  { name: '2-Bit Demichrome', pals: Array(8).fill(['#e9efec','#a0a08b','#555568','#211e20']) },
+  { name: 'CGA',              pals: Array(8).fill(['#ffffff','#55ffff','#ff55ff','#000000']) },
+  { name: 'Graustufen',       pals: Array(8).fill(['#e8e8e8','#a0a0a0','#585858','#181818']) },
+];
+function presetPalettes(idx) {
+  return PALETTE_PRESETS[idx].pals.map((hex, i) => ({ name: PAL_SLOTS[i], hex: hex.slice(), rgb: hex.map(hexToRgb) }));
+}
+let curPreset = 0;
+// Zeichen-Pool für hochgeladene Tiles jenseits der Standard-12
+const CHAR_POOL = '.#DOTFBCHSEPabcdefghijklmnopqrstuvwxyz0123456789+*=~^%&@$';
+
+const CELL = 24, SRC = 8;
+const LS_KEY = 'smalldurs_rooms_v2';
+const LAYER_NAMES = ['Boden', 'Objekt 1', 'Objekt 2'];
+const DEFAULT_MARKERS = ['start', 'laezel', 'us', 'shadow', 'rune', 'helm'];
+const MARKER_COLORS = { start:'#6cc46c', laezel:'#c46c9a', us:'#6c9ac4', shadow:'#8a6cc4', rune:'#c4a24a', helm:'#c46c6c' };
+// Sprite-Größen, sortiert nach Konsole (px). Tile-Footprint = w/8 × h/8.
+const SPRITE_SIZES = [
+  { console: 'Game Boy',   list: [[8,8],[8,16],[16,16],[16,24],[24,24],[32,32],[32,48]] },
+  { console: 'GBA',        list: [[8,8],[16,16],[16,32],[32,32],[32,64],[64,64]] },
+  { console: 'SNES',       list: [[8,8],[16,16],[32,32],[64,64]] },
+  { console: 'NES',        list: [[8,8],[8,16],[16,16],[16,32]] },
+  { console: 'Mega Drive', list: [[8,8],[16,16],[24,24],[32,32],[32,48]] },
+];
+
+// ================= State =================
+let cols = 20, rows = 18;
+let layers = [];               // layers[i][r][c] = char | null   (0=Boden,1=Obj1,2=Obj2)
+let layerVis = [true, true, true];
+let markers = {};              // name -> {x,y}
+let markerOrder = [];          // Reihenfolge der Namen
+let objects = [];              // {name,x,y,tw,th,console,img,imgSrc}  — platzierte Sprites
+let curObject = null;          // Index in objects | null
+let activeLayer = 0;           // 0..2 | 'events'
+let curTile = 0;               // Index in tiledefs, oder -1 = Radierer
+let curStamp = null;           // {w,h,tiles:[[char|null]]} — Mehrfach-Tile-Pinsel aus dem Blatt
+let curMarker = null;
+let showGrid = true, dimOthers = true;
+let recolor = true;            // GBC-Farben: Tiles auf 4 Stufen quantisieren + Palette einfärben
+let undoStack = [];
+
+let tileset = { img: new Image(), tilesPerRow: 12, count: 12, defs: BUILTIN_DEFS.map(d => ({ ...d })) };
+let tilesReady = false;
+let chToIdx = {};
+
+// Paletten (rgb aus hex abgeleitet) + Tile-Cache der eingefärbten 8×8-Kacheln
+let palettes = presetPalettes(0);
+let tileCache = [];            // tileCache[i] = 8×8-Canvas (eingefärbt) | null
+let srcCanvas = null;          // Offscreen mit dem gesamten Tileset (für Pixel-Lesen)
+
+const $ = id => document.getElementById(id);
+const cv = $('grid'), ctx = cv.getContext('2d');
+
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rebuildChMap() { chToIdx = {}; tileset.defs.forEach((d, i) => { if (d.ch) chToIdx[d.ch] = i; }); }
+function srcXY(idx) { return [(idx % tileset.tilesPerRow) * SRC, Math.floor(idx / tileset.tilesPerRow) * SRC]; }
+
+// ---- Tile-Atlas (wächst, nimmt Tiles aus Blättern auf) + Dubletten-Erkennung ----
+let tileHashes = {};
+function tileHash(d) { let h = 2166136261 >>> 0; for (let i = 0; i < d.length; i += 4) { h ^= d[i]; h = Math.imul(h, 16777619); h ^= d[i+1]; h = Math.imul(h, 16777619); h ^= d[i+2]; h = Math.imul(h, 16777619); h ^= d[i+3]; h = Math.imul(h, 16777619); } return h >>> 0; }
+function ensureAtlas() {
+  if (tileset.img && tileset.img.__atlas) return;
+  const tpr = tileset.tilesPerRow || 16;
+  const rows = Math.max(4, Math.ceil((tileset.defs.length + 1) / tpr));
+  const a = document.createElement('canvas'); a.__atlas = true; a.width = tpr * SRC; a.height = rows * SRC;
+  const g = a.getContext('2d'); g.imageSmoothingEnabled = false;
+  if (tileset.img && (tileset.img.width || tileset.img.naturalWidth)) g.drawImage(tileset.img, 0, 0);
+  tileset.img = a; tileset.tilesPerRow = tpr;
+  rebuildTileHashes();
+}
+function growAtlas(minRows) {
+  const a = tileset.img; if (a.height >= minRows * SRC) return;
+  const n = document.createElement('canvas'); n.__atlas = true; n.width = a.width; n.height = minRows * SRC;
+  const g = n.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(a, 0, 0);
+  tileset.img = n;
+}
+function rebuildTileHashes() {
+  tileHashes = {}; if (!tileset.img.__atlas) return;
+  const g = tileset.img.getContext('2d');
+  for (let i = 0; i < tileset.defs.length; i++) { const [sx, sy] = srcXY(i); try { tileHashes[tileHash(g.getImageData(sx, sy, SRC, SRC).data)] = i; } catch (_) {} }
+}
+function nextChar() { const used = new Set(tileset.defs.map(d => d.ch)); for (const c of CHAR_POOL) if (!used.has(c)) return c; return '?'; }
+function colorClose(r, g, b, rgb, tol) { tol = tol || 24; return Math.abs(r - rgb[0]) <= tol && Math.abs(g - rgb[1]) <= tol && Math.abs(b - rgb[2]) <= tol; }
+// ordnet einen Durchschnitts-RGB einem Paletten-Slot zu (Gras/Wasser/Erde/Stein/Holz/Laub/Blüten/Neutral)
+function classifyPalette(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (d < 28) return 3;                       // grau → Stein
+  let hh; if (mx === r) hh = ((g - b) / d) % 6; else if (mx === g) hh = (b - r) / d + 2; else hh = (r - g) / d + 4;
+  hh *= 60; if (hh < 0) hh += 360;
+  if (hh < 18 || hh >= 330) return 6;         // rot/pink → Blüten
+  if (hh < 70) return (mx < 170 ? 4 : 2);     // braun(dunkel)→Holz, gelb/orange(hell)→Erde
+  if (hh < 165) return (mx < 150 ? 5 : 0);    // dunkelgrün→Laub, grün→Gras
+  if (hh < 255) return 1;                     // cyan/blau → Wasser
+  return 6;                                   // violett → Blüten
+}
+// extrahiert 8×8 aus Quellpixeln (mit Farbschlüssel), gibt Tile-Index zurück (dedupliziert). null wenn komplett leer.
+function addTileFromRegion(data, srcW, sx, sy, transpRgb) {
+  const tmp = new Uint8ClampedArray(SRC * SRC * 4);
+  let anyOpaque = false, sr = 0, sg = 0, sb = 0, sn = 0;
+  for (let y = 0; y < SRC; y++) for (let x = 0; x < SRC; x++) {
+    const si = ((sy + y) * srcW + (sx + x)) * 4, oi = (y * SRC + x) * 4;
+    let r = data[si], g = data[si+1], b = data[si+2], a = data[si+3];
+    if (transpRgb && a > 0 && colorClose(r, g, b, transpRgb)) a = 0;
+    tmp[oi] = r; tmp[oi+1] = g; tmp[oi+2] = b; tmp[oi+3] = a;
+    if (a > 8) { anyOpaque = true; sr += r; sg += g; sb += b; sn++; }
+  }
+  if (!anyOpaque) return null;
+  ensureAtlas();
+  const h = tileHash(tmp);
+  if (tileHashes[h] != null) return tileHashes[h];
+  const idx = tileset.defs.length, tpr = tileset.tilesPerRow;
+  growAtlas(Math.ceil((idx + 1) / tpr));
+  const [dx, dy] = srcXY(idx);
+  tileset.img.getContext('2d').putImageData(new ImageData(tmp, SRC, SRC), dx, dy);
+  const pal = classifyPalette(sr / sn, sg / sn, sb / sn);   // passende Palette nach Farbton
+  tileset.defs.push({ ch: nextChar(), name: 'Tile ' + idx, solid: false, canopy: false, pal });
+  tileHashes[h] = idx; rebuildChMap();
+  return idx;
+}
+
+// ---- Recolor: Quellpixel → 4 Helligkeitsstufen → Palette-Farbe ----
+function buildTileCache() {
+  tileCache = [];
+  if (!tilesReady) return;
+  const w = tileset.img.naturalWidth || tileset.img.width, h = tileset.img.naturalHeight || tileset.img.height;
+  if (!srcCanvas || srcCanvas.width !== w || srcCanvas.height !== h) {
+    srcCanvas = document.createElement('canvas'); srcCanvas.width = w; srcCanvas.height = h;
+  }
+  const sg = srcCanvas.getContext('2d'); sg.imageSmoothingEnabled = false;
+  sg.clearRect(0, 0, w, h); sg.drawImage(tileset.img, 0, 0);
+  let data; try { data = sg.getImageData(0, 0, w, h).data; } catch (e) { recolor = false; return; }
+  tileset.defs.forEach((d, i) => {
+    const [sx, sy] = srcXY(i);
+    const c = document.createElement('canvas'); c.width = SRC; c.height = SRC;
+    const g = c.getContext('2d'); const out = g.createImageData(SRC, SRC);
+    const pal = (palettes[d.pal] || palettes[0]).rgb;
+    for (let y = 0; y < SRC; y++) for (let x = 0; x < SRC; x++) {
+      const si = ((sy + y) * w + (sx + x)) * 4, oi = (y * SRC + x) * 4;
+      const a = data[si + 3];
+      if (a < 128) { out.data[oi + 3] = 0; continue; }
+      const lum = 0.299 * data[si] + 0.587 * data[si + 1] + 0.114 * data[si + 2];
+      const q = lum >= 192 ? 0 : lum >= 128 ? 1 : lum >= 64 ? 2 : 3;   // hell→dunkel = Index 0→3
+      out.data[oi] = pal[q][0]; out.data[oi + 1] = pal[q][1]; out.data[oi + 2] = pal[q][2]; out.data[oi + 3] = 255;
+    }
+    g.putImageData(out, 0, 0); tileCache[i] = c;
+  });
+}
+// zeichnet Tile idx in ein Ziel-Rechteck (recolored oder roh)
+function drawTile(g, idx, dx, dy, dw, dh) {
+  if (recolor && tileCache[idx]) g.drawImage(tileCache[idx], 0, 0, SRC, SRC, dx, dy, dw, dh);
+  else { const [sx, sy] = srcXY(idx); g.drawImage(tileset.img, sx, sy, SRC, SRC, dx, dy, dw, dh); }
+}
+
+// ================= Map lifecycle =================
+function blankLayer(w, h, fill) {
+  const a = [];
+  for (let r = 0; r < h; r++) { const row = []; for (let c = 0; c < w; c++) row.push(fill); a.push(row); }
+  return a;
+}
+function newMap(w, h) {
+  cols = w; rows = h;
+  const ground = blankLayer(w, h, '.');
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++)
+    if (r === 0 || c === 0 || r === h - 1 || c === w - 1) ground[r][c] = '#';   // solider Rand
+  layers = [ground, blankLayer(w, h, null), blankLayer(w, h, null)];
+  markers = {}; markerOrder = [];
+  objects = []; curObject = null;
+  undoStack = [];
+  syncSize();
+}
+function syncSize() {
+  cv.width = cols * CELL; cv.height = rows * CELL;
+  $('dims').textContent = cols + ' × ' + rows;
+  draw();
+}
+
+// ================= Rendering =================
+function draw() {
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!tilesReady) return;
+  layers.forEach((lay, li) => {
+    if (!layerVis[li]) return;
+    const dim = dimOthers && activeLayer !== 'events' && li !== activeLayer;
+    ctx.globalAlpha = dim ? 0.35 : 1;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const ch = lay[r][c];
+      if (ch == null) continue;
+      const idx = chToIdx[ch]; if (idx == null) continue;
+      drawTile(ctx, idx, c * CELL, r * CELL, CELL, CELL);
+    }
+  });
+  ctx.globalAlpha = 1;
+  if (showGrid) {
+    ctx.strokeStyle = '#ffffff20'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let c = 0; c <= cols; c++) { ctx.moveTo(c * CELL + .5, 0); ctx.lineTo(c * CELL + .5, cv.height); }
+    for (let r = 0; r <= rows; r++) { ctx.moveTo(0, r * CELL + .5); ctx.lineTo(cv.width, r * CELL + .5); }
+    ctx.stroke();
+  }
+  // Objekte / Sprites (Content — immer voll sichtbar), Auswahl umrandet auf Event-Ebene
+  objects.forEach((o, oi) => {
+    if (!o.img) return;
+    const dw = o.tw * CELL, dh = o.th * CELL, dx = o.x * CELL, dy = o.y * CELL;
+    ctx.drawImage(o.img, 0, 0, o.img.naturalWidth, o.img.naturalHeight, dx, dy, dw, dh);
+    if (activeLayer === 'events') {
+      ctx.strokeStyle = curObject === oi ? '#7cc47c' : '#ffffff55';
+      ctx.lineWidth = curObject === oi ? 2 : 1;
+      ctx.strokeRect(dx + 1, dy + 1, dw - 2, dh - 2);
+      ctx.font = 'bold 9px system-ui'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#000a'; ctx.fillRect(dx, dy, ctx.measureText(o.name).width + 6, 12);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(o.name, dx + 2, dy + 2);
+    }
+  });
+
+  // Marker (immer sichtbar, hervorgehoben wenn Event-Ebene aktiv)
+  const evActive = activeLayer === 'events';
+  ctx.globalAlpha = evActive ? 1 : 0.5;
+  markerOrder.forEach(name => {
+    const m = markers[name]; if (!m) return;
+    const x = m.x * CELL, y = m.y * CELL;
+    ctx.fillStyle = MARKER_COLORS[name] || '#e0c060';
+    ctx.globalAlpha = evActive ? 0.6 : 0.3; ctx.fillRect(x, y, CELL, CELL); ctx.globalAlpha = evActive ? 1 : 0.5;
+    ctx.strokeStyle = '#000a'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+    ctx.fillStyle = '#000'; ctx.font = 'bold 9px system-ui'; ctx.textBaseline = 'top';
+    ctx.fillText(name, x + 2, y + 2);
+  });
+  ctx.globalAlpha = 1;
+}
+
+// ================= Layer UI =================
+function buildLayerList() {
+  const box = $('layerList'); box.innerHTML = '';
+  LAYER_NAMES.forEach((nm, i) => {
+    const el = document.createElement('div');
+    el.className = 'layer-row' + (activeLayer === i ? ' sel' : '');
+    const badge = i === 0 ? 'Boden' : i === 1 ? 'solide Props' : 'canopy';
+    el.innerHTML = '<span class="eye' + (layerVis[i] ? '' : ' off') + '">' + (layerVis[i] ? '●' : '○') +
+      '</span><span class="lname">' + nm + '</span><span class="badge">' + badge + '</span>';
+    el.querySelector('.eye').onclick = e => { e.stopPropagation(); layerVis[i] = !layerVis[i]; buildLayerList(); draw(); };
+    el.onclick = () => setActiveLayer(i);
+    box.appendChild(el);
+  });
+  // Event-Ebene
+  const ev = document.createElement('div');
+  ev.className = 'layer-row' + (activeLayer === 'events' ? ' sel' : '');
+  ev.innerHTML = '<span class="eye" style="color:var(--accent2)">◆</span><span class="lname">Events</span><span class="badge">Marker</span>';
+  ev.onclick = () => setActiveLayer('events');
+  box.appendChild(ev);
+}
+function setActiveLayer(l) {
+  activeLayer = l;
+  $('eventPanel').style.display = l === 'events' ? 'block' : 'none';
+  $('paletteTitle').style.display = l === 'events' ? 'none' : 'block';
+  $('tileInspector').style.display = l === 'events' ? 'none' : 'block';
+  $('swatches').style.display = l === 'events' ? 'none' : 'block';
+  $('btnUpload').style.display = l === 'events' ? 'none' : 'block';
+  buildLayerList(); buildPalette(); buildMarkerList(); buildObjectList(); buildObjInspector(); draw();
+}
+
+// ================= Palette UI (Raster + Inspektor) =================
+function buildPalette() {
+  const box = $('swatches'); box.innerHTML = '';
+  if (activeLayer === 'events') { buildInspector(); return; }
+  // Radierer nur auf Objekt-Ebenen sinnvoll (Boden hat immer ein Tile)
+  if (activeLayer !== 0) {
+    const er = document.createElement('canvas');
+    er.className = 'swatch eraser' + (curTile === -1 ? ' sel' : '');
+    er.width = 34; er.height = 34; er.title = 'Radierer (leer)';
+    er.onclick = () => { curTile = -1; curStamp = null; refreshPalSel(); buildInspector(); };
+    box.appendChild(er);
+  }
+  tileset.defs.forEach((d, i) => {
+    const sc = document.createElement('canvas');
+    sc.className = 'swatch' + (curTile === i ? ' sel' : '');
+    sc.width = 34; sc.height = 34; sc.dataset.i = i;
+    sc.title = (d.ch || '?') + ' · ' + d.name;
+    sc.onclick = () => { curTile = i; curStamp = null; refreshPalSel(); buildInspector(); };
+    box.appendChild(sc);
+  });
+  drawSwatches();
+  buildInspector();
+}
+function drawSwatches() {
+  if (!tilesReady) return;
+  document.querySelectorAll('#swatches canvas[data-i]').forEach(sc => {
+    const i = +sc.dataset.i, g = sc.getContext('2d'); g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, 34, 34);
+    drawTile(g, i, 0, 0, 34, 34);
+  });
+}
+function refreshPalSel() {
+  document.querySelectorAll('#swatches .swatch').forEach(el => {
+    const isEr = el.classList.contains('eraser');
+    el.classList.toggle('sel', isEr ? curTile === -1 : +el.dataset.i === curTile);
+  });
+}
+function buildInspector() {
+  const box = $('tileInspector');
+  if (activeLayer === 'events') { box.innerHTML = ''; return; }
+  if (curTile === -1) { box.innerHTML = '<div class="insp"><b>Radierer</b>&nbsp;<span class="hint">löscht Tiles auf dieser Ebene</span></div>'; return; }
+  const d = tileset.defs[curTile]; if (!d) { box.innerHTML = ''; return; }
+  box.innerHTML =
+    '<div class="insp"><canvas class="ipreview" width="46" height="46"></canvas>' +
+    '<div class="ifields">' +
+    '<div class="irow"><label>Zeichen</label><input id="iCh" maxlength="1"></div>' +
+    '<div class="irow"><label>Name</label><input id="iName"></div>' +
+    '<div class="flags"><span class="chip solid' + (d.solid ? ' on' : '') + '">solide</span>' +
+    '<span class="chip canopy' + (d.canopy ? ' on' : '') + '">canopy</span></div>' +
+    '</div></div>' +
+    '<div class="palpick"><label>Palette</label><div class="palramps" id="palRamps"></div></div>';
+  const pv = box.querySelector('.ipreview').getContext('2d'); pv.imageSmoothingEnabled = false;
+  if (tilesReady) drawTile(pv, curTile, 0, 0, 46, 46);
+  const iCh = box.querySelector('#iCh'), iName = box.querySelector('#iName');
+  iCh.value = d.ch || ''; iName.value = d.name;
+  iCh.onchange = () => { d.ch = iCh.value.slice(0, 1); rebuildChMap(); refreshTitles(); draw(); };
+  iName.onchange = () => { d.name = iName.value.trim(); refreshTitles(); };
+  box.querySelector('.chip.solid').onclick = e => { d.solid = !d.solid; e.target.classList.toggle('on'); };
+  box.querySelector('.chip.canopy').onclick = e => { d.canopy = !d.canopy; e.target.classList.toggle('on'); };
+  // Palette-Picker (8 Rampen)
+  const rr = box.querySelector('#palRamps');
+  palettes.forEach((p, pi) => {
+    const el = document.createElement('div');
+    el.className = 'ramp' + (d.pal === pi ? ' sel' : '');
+    el.title = pi + ' · ' + p.name;
+    el.innerHTML = p.hex.map(h => '<i style="background:' + h + '"></i>').join('');
+    el.onclick = () => { d.pal = pi; buildTileCache(); draw(); drawSwatches(); buildInspector(); };
+    rr.appendChild(el);
+  });
+}
+function refreshTitles() {
+  document.querySelectorAll('#swatches canvas[data-i]').forEach(sc => {
+    const d = tileset.defs[+sc.dataset.i]; sc.title = (d.ch || '?') + ' · ' + d.name;
+  });
+}
+
+// ================= Markers UI =================
+function buildMarkerList() {
+  const box = $('markerList'); if (!box) return; box.innerHTML = '';
+  const names = markerOrder.length ? markerOrder : [];
+  // stelle sicher, dass die Standard-Namen anwählbar sind
+  DEFAULT_MARKERS.forEach(n => { if (!markerOrder.includes(n)) markerOrder.push(n); });
+  markerOrder.forEach(name => {
+    const el = document.createElement('div');
+    el.className = 'marker-row' + (curMarker === name ? ' sel' : '');
+    const m = markers[name];
+    el.innerHTML = '<span class="dot" style="background:' + (MARKER_COLORS[name] || '#e0c060') + '"></span>' +
+      '<span class="nm">' + name + '</span><span class="pos">' + (m ? m.x + ',' + m.y : '—') + '</span>';
+    el.onclick = () => { curMarker = name; curObject = null; buildMarkerList(); buildObjectList(); buildObjInspector(); };
+    box.appendChild(el);
+  });
+}
+
+// ================= Objekte / Sprites UI =================
+function buildObjectList() {
+  const box = $('objectList'); if (!box) return; box.innerHTML = '';
+  if (!objects.length) { box.innerHTML = '<div class="hint">Noch keine Objekte. Grafik laden ↓</div>'; return; }
+  objects.forEach((o, oi) => {
+    const el = document.createElement('div');
+    el.className = 'marker-row' + (curObject === oi ? ' sel' : '');
+    el.innerHTML = '<span class="dot" style="background:#7cc47c;border-radius:2px"></span>' +
+      '<span class="nm">' + o.name + '</span><span class="pos">' + o.x + ',' + o.y + ' · ' + o.tw + '×' + o.th + 't</span>';
+    el.onclick = () => { curObject = oi; curMarker = null; buildObjectList(); buildObjInspector(); buildMarkerList(); draw(); };
+    box.appendChild(el);
+  });
+}
+function sizeSelectHTML(o) {
+  let opts = '<option value="free"' + (o.console === 'Frei' ? ' selected' : '') + '>Frei (Bildgröße)</option>';
+  SPRITE_SIZES.forEach(grp => {
+    opts += '<optgroup label="' + grp.console + '">';
+    grp.list.forEach(([w, h]) => {
+      const sel = (o.console === grp.console && o.tw === w / 8 && o.th === h / 8) ? ' selected' : '';
+      opts += '<option value="' + grp.console + '|' + w + '|' + h + '"' + sel + '>' + w + '×' + h + ' (' + (w / 8) + '×' + (h / 8) + 't)</option>';
+    });
+    opts += '</optgroup>';
+  });
+  return '<select id="objSize">' + opts + '</select>';
+}
+function buildObjInspector() {
+  const box = $('objInspector'); if (!box) return;
+  if (curObject == null || !objects[curObject]) { box.innerHTML = ''; return; }
+  const o = objects[curObject];
+  box.innerHTML =
+    '<div class="insp" style="flex-direction:column;align-items:stretch">' +
+    '<div class="irow"><label>Name</label><input id="objName"></div>' +
+    '<div class="irow"><label>Größe</label>' + sizeSelectHTML(o) + '</div>' +
+    '<div class="irow"><label>Position</label><span class="hint">' + o.x + ',' + o.y + ' — ' + (o.tw * 8) + '×' + (o.th * 8) + 'px' + '</span></div>' +
+    '<div style="display:flex;gap:6px;margin-top:6px">' +
+    '<button id="objSave">PNG speichern</button><button id="objDel">Entfernen</button></div>' +
+    '</div>';
+  const nm = box.querySelector('#objName'); nm.value = o.name;
+  nm.onchange = () => { o.name = nm.value.trim() || o.name; buildObjectList(); draw(); };
+  box.querySelector('#objSize').onchange = e => {
+    const v = e.target.value;
+    if (v === 'free') { o.console = 'Frei'; o.tw = Math.max(1, Math.ceil(o.img.naturalWidth / SRC)); o.th = Math.max(1, Math.ceil(o.img.naturalHeight / SRC)); }
+    else { const [cons, w, h] = v.split('|'); o.console = cons; o.tw = w / SRC; o.th = h / SRC; }
+    draw(); buildObjectList(); buildObjInspector();
+  };
+  box.querySelector('#objSave').onclick = () => { if (o.imgSrc) download(o.name + '.png', null, o.imgSrc); };
+  box.querySelector('#objDel').onclick = () => { pushUndo(); objects.splice(curObject, 1); curObject = null; buildObjectList(); buildObjInspector(); draw(); };
+}
+
+// ================= Painting =================
+function cellFromEvent(e) {
+  const rect = cv.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / (rect.width / cols));
+  const y = Math.floor((e.clientY - rect.top) / (rect.height / rows));
+  if (x < 0 || y < 0 || x >= cols || y >= rows) return null;
+  return { x, y };
+}
+function pushUndo() {
+  undoStack.push({ layers: layers.map(l => l.map(r => r.slice())), markers: JSON.parse(JSON.stringify(markers)), markerOrder: markerOrder.slice(), objects: objects.map(o => ({ ...o })), cols, rows });
+  if (undoStack.length > 60) undoStack.shift();
+}
+function undo() {
+  const s = undoStack.pop(); if (!s) { status('Nichts rückgängig zu machen.'); return; }
+  layers = s.layers; markers = s.markers; markerOrder = s.markerOrder; objects = s.objects; cols = s.cols; rows = s.rows;
+  if (curObject != null && curObject >= objects.length) curObject = null;
+  syncSize(); buildMarkerList(); buildObjectList(); buildObjInspector();
+}
+
+let painting = false, lastCell = null;
+function paintCell(cell) {
+  if (activeLayer === 'events') return;
+  const lay = layers[activeLayer];
+  if (curStamp) {
+    for (let dy = 0; dy < curStamp.h; dy++) for (let dx = 0; dx < curStamp.w; dx++) {
+      const ch = curStamp.tiles[dy][dx]; if (ch == null) continue;
+      const ty = cell.y + dy, tx = cell.x + dx;
+      if (ty >= 0 && tx >= 0 && ty < rows && tx < cols) lay[ty][tx] = ch;
+    }
+    draw(); return;
+  }
+  if (curTile < 0 || !tileset.defs[curTile]) { if (curTile !== -1) return; }
+  const val = curTile === -1 ? (activeLayer === 0 ? '.' : null) : tileset.defs[curTile].ch;
+  if (lay[cell.y][cell.x] === val) return;
+  lay[cell.y][cell.x] = val; draw();
+}
+function placeMarker(cell) {
+  if (!curMarker) { status('Erst einen Marker links wählen.'); return; }
+  pushUndo();
+  const cur = markers[curMarker];
+  if (cur && cur.x === cell.x && cur.y === cell.y) delete markers[curMarker];
+  else markers[curMarker] = { x: cell.x, y: cell.y };
+  draw(); buildMarkerList();
+}
+
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('mousedown', e => {
+  const cell = cellFromEvent(e); if (!cell) return;
+  if (e.button === 2) {                     // Pipette (nur Tile-Ebenen)
+    if (activeLayer !== 'events') {
+      const ch = layers[activeLayer][cell.y][cell.x];
+      if (ch != null && chToIdx[ch] != null) { curTile = chToIdx[ch]; curStamp = null; refreshPalSel(); buildInspector(); status('Pipette: ' + ch); }
+    }
+    return;
+  }
+  if (e.button !== 0) return;
+  if (activeLayer === 'events') {
+    if (curObject != null && objects[curObject]) { pushUndo(); objects[curObject].x = cell.x; objects[curObject].y = cell.y; draw(); buildObjInspector(); buildObjectList(); }
+    else placeMarker(cell);
+    return;
+  }
+  pushUndo(); painting = true; lastCell = cell; paintCell(cell);
+});
+cv.addEventListener('mousemove', e => {
+  const cell = cellFromEvent(e);
+  if (cell) status('x=' + cell.x + '  y=' + cell.y);
+  if (!painting || !cell) return;
+  if (lastCell && lastCell.x === cell.x && lastCell.y === cell.y) return;
+  lastCell = cell; paintCell(cell);
+});
+window.addEventListener('mouseup', () => { painting = false; lastCell = null; });
+
+// ================= Flatten & Export =================
+function flatten() {                         // oberste nicht-leere Ebene gewinnt
+  const out = [];
+  for (let r = 0; r < rows; r++) {
+    let line = '';
+    for (let c = 0; c < cols; c++) {
+      const ch = layers[2][r][c] ?? layers[1][r][c] ?? layers[0][r][c] ?? '.';
+      line += ch;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function markerComments() {
+  return markerOrder.filter(n => markers[n]).map(n => '// ' + n + ' ' + markers[n].x + ',' + markers[n].y);
+}
+function objectComments() {
+  return objects.map(o => '// obj ' + o.name + ' ' + o.x + ',' + o.y + ' ' + o.tw + 'x' + o.th + 't (' +
+    (o.console && o.console !== 'Frei' ? o.console + ' ' : '') + (o.tw * 8) + 'x' + (o.th * 8) + 'px, sprite:' + o.name + '.png)');
+}
+function legendComments() {
+  const used = new Set(flatten().join('').split(''));
+  const usedDefs = tileset.defs.filter(d => used.has(d.ch));
+  const lines = usedDefs.map(d =>
+    '// tile ' + d.ch + ' = ' + d.name + (d.solid ? ' [solide]' : ' [begehbar]') + (d.canopy ? ' [canopy]' : '') +
+    ' pal=' + (d.pal ?? 0) + '(' + (palettes[d.pal] || palettes[0]).name + ')');
+  const usedPals = [...new Set(usedDefs.map(d => d.pal ?? 0))].sort((a, b) => a - b);
+  usedPals.forEach(pi => {
+    const p = palettes[pi]; if (!p) return;
+    lines.push('// pal ' + pi + ' ' + p.name + ' = ' + p.hex.map(h => h.slice(1).toUpperCase()).join(','));
+  });
+  return lines;
+}
+function mapToText() {
+  let out = flatten().join('\n');
+  const mk = markerComments(); if (mk.length) out += '\n' + mk.join('\n');
+  const ob = objectComments(); if (ob.length) out += '\n' + ob.join('\n');
+  if ($('chkLegend').checked) out += '\n' + legendComments().join('\n');
+  return out;
+}
+function sanitizeName(s) {
+  let n = (s || 'ROOM').toUpperCase().replace(/[^A-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1');
+  return n || 'ROOM';
+}
+function mapToCArray() {
+  const name = sanitizeName($('roomName').value);
+  let out = 'const char * const ' + name + '_M[' + rows + '] = {\n';
+  out += flatten().map(r => '    "' + r + '"').join(',\n') + '\n};';
+  const mk = markerComments(); if (mk.length) out += '\n' + mk.join('\n');
+  const ob = objectComments(); if (ob.length) out += '\n' + ob.join('\n');
+  if ($('chkLegend').checked) out += '\n' + legendComments().join('\n');
+  return out;
+}
+function openExport() {
+  $('exportTitle').textContent = 'Export — ' + sanitizeName($('roomName').value) + ' (' + cols + '×' + rows + ', geflacht)';
+  $('exportText').value = mapToText();
+  $('exportDlg').showModal();
+}
+
+// ---- JSON-Export (selbst-enthalten, base64) ----
+function tilesetDataURL() { return tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src || null); }
+function rowToStr(row) { return row.map(ch => ch == null ? ' ' : ch).join(''); }
+// Compositing: 3 Tile-Ebenen pro Zelle (recolored, mit Alpha) zu neuen 8×8-Tiles verschmelzen, deduplizieren
+function bakeComposited() {
+  const cell = document.createElement('canvas'); cell.width = SRC; cell.height = SRC;
+  const cg = cell.getContext('2d'); cg.imageSmoothingEnabled = false;
+  const uniq = new Map(), list = [], map = [];
+  for (let r = 0; r < rows; r++) { const row = [];
+    for (let c = 0; c < cols; c++) {
+      cg.clearRect(0, 0, SRC, SRC);
+      for (let li = 0; li < 3; li++) {
+        const ch = layers[li][r][c]; if (ch == null) continue;
+        const idx = chToIdx[ch]; if (idx == null) continue;
+        if (recolor && tileCache[idx]) cg.drawImage(tileCache[idx], 0, 0);
+        else { const [sx, sy] = srcXY(idx); cg.drawImage(tileset.img, sx, sy, SRC, SRC, 0, 0, SRC, SRC); }
+      }
+      const data = cg.getImageData(0, 0, SRC, SRC);
+      const h = tileHash(data.data);
+      let bi = uniq.get(h);
+      if (bi == null) { bi = list.length; uniq.set(h, bi); const cc = document.createElement('canvas'); cc.width = SRC; cc.height = SRC; cc.getContext('2d').putImageData(data, 0, 0); list.push(cc); }
+      row.push(bi);
+    }
+    map.push(row);
+  }
+  const columns = Math.max(1, Math.min(16, list.length));
+  const rowsN = Math.max(1, Math.ceil(list.length / columns));
+  const atlas = document.createElement('canvas'); atlas.width = columns * SRC; atlas.height = rowsN * SRC;
+  const ag = atlas.getContext('2d'); ag.imageSmoothingEnabled = false;
+  list.forEach((cc, i) => ag.drawImage(cc, (i % columns) * SRC, Math.floor(i / columns) * SRC));
+  return { tileWidth: SRC, tileHeight: SRC, columns, count: list.length, image: atlas.toDataURL('image/png'), map };
+}
+function buildJSON() {
+  const baked = bakeComposited();
+  return {
+    format: 'pixelmap-room', version: 1,
+    name: sanitizeName($('roomName').value),
+    tileSize: SRC,
+    size: { cols, rows },
+    palettes: palettes.map(p => ({ name: p.name, colors: p.hex.slice() })),
+    tiles: tileset.defs.map((d, i) => ({ index: i, char: d.ch, name: d.name, solid: !!d.solid, canopy: !!d.canopy, palette: d.pal ?? 0 })),
+    layers: { ground: layers[0].map(rowToStr), object1: layers[1].map(rowToStr), object2: layers[2].map(rowToStr), flat: flatten() },
+    tileset: { columns: tileset.tilesPerRow, tileSize: SRC, image: tilesetDataURL() },
+    baked,
+    objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, w: o.tw * SRC, h: o.th * SRC, tilesW: o.tw, tilesH: o.th, console: o.console, image: o.imgSrc || null })),
+    markers: Object.fromEntries(markerOrder.filter(n => markers[n]).map(n => [n, markers[n]]))
+  };
+}
+function jsonString() { return JSON.stringify(buildJSON(), null, 2); }
+function exportJSON(doCopy) {
+  const j = buildJSON(); const s = JSON.stringify(j, null, 2);
+  $('exportText').value = s.length > 40000 ? s.slice(0, 40000) + '\n… (' + (s.length - 40000) + ' Zeichen mehr; Datei enthält alles)' : s;
+  const warn = j.baked.count > 192 ? ' <span class="warn">⚠ ' + j.baked.count + ' gebackene Tiles > 192 (GB-Budget)</span>' : '';
+  status('<span class="ok">JSON: ' + j.baked.count + ' gebackene Tiles, ' + j.objects.length + ' Objekte.</span>' + warn);
+  if (doCopy) copy(s, 'JSON kopiert.');
+  else download(sanitizeName($('roomName').value).toLowerCase() + '.json', s);
+}
+function download(fn, text, href) {
+  const a = document.createElement('a');
+  const blobUrl = href || URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.href = blobUrl; a.download = fn; a.click();
+  if (!href) URL.revokeObjectURL(blobUrl);
+}
+async function copy(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); status('<span class="ok">' + okMsg + '</span>'); }
+  catch { const t = $('exportText'); t.value = text; t.select(); document.execCommand('copy'); status('<span class="ok">' + okMsg + ' (Fallback)</span>'); }
+}
+
+// ================= Rand-Check (auf geflachter Karte) =================
+function checkBorder() {
+  const flat = flatten();
+  const solidCh = new Set(tileset.defs.filter(d => d.solid).map(d => d.ch));
+  const ok = ch => solidCh.has(ch) || ch === 'D';
+  const bad = [];
+  for (let c = 0; c < cols; c++) { if (!ok(flat[0][c])) bad.push([c, 0]); if (!ok(flat[rows - 1][c])) bad.push([c, rows - 1]); }
+  for (let r = 1; r < rows - 1; r++) { if (!ok(flat[r][0])) bad.push([0, r]); if (!ok(flat[r][cols - 1])) bad.push([cols - 1, r]); }
+  draw();
+  if (bad.length) {
+    ctx.strokeStyle = '#e06666'; ctx.lineWidth = 3;
+    bad.forEach(([x, y]) => ctx.strokeRect(x * CELL + 1.5, y * CELL + 1.5, CELL - 3, CELL - 3));
+    status('<span class="err">Rand offen: ' + bad.length + ' Zelle(n) nicht solide/Tür.</span> Rot markiert.');
+  } else status('<span class="ok">✓ Rand geschlossen.</span>');
+}
+
+// ================= Tileset-Upload =================
+function loadTilesetFromImage(img) {
+  const tpr = Math.max(1, Math.floor(img.naturalWidth / SRC));
+  const tRows = Math.max(1, Math.floor(img.naturalHeight / SRC));
+  const count = tpr * tRows;
+  const defs = [];
+  for (let i = 0; i < count; i++) {
+    const old = tileset.defs[i];
+    defs.push(old ? { ...old } : { ch: CHAR_POOL[i] || '?', name: 'Tile ' + i, solid: false, canopy: false, pal: 7 });
+  }
+  tileset = { img, tilesPerRow: tpr, count, defs };
+  rebuildChMap(); buildTileCache();
+  status('Tileset geladen: ' + count + ' Tiles (' + tpr + '×' + tRows + '). Zeichen/Palette rechts anpassen.');
+  buildPalette(); draw();
+}
+$('fileInput').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => loadTilesetFromImage(img);
+  img.onerror = () => status('<span class="err">Bild konnte nicht geladen werden.</span>');
+  img.src = URL.createObjectURL(f);
+  e.target.value = '';
+};
+$('objFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const tw = Math.max(1, Math.ceil(img.naturalWidth / SRC)), th = Math.max(1, Math.ceil(img.naturalHeight / SRC));
+    let imgSrc = null;
+    try { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); imgSrc = c.toDataURL('image/png'); } catch (_) {}
+    pushUndo();
+    objects.push({ name: 'obj' + (objects.length + 1), x: 1, y: 1, tw, th, console: 'Frei', img, imgSrc });
+    curObject = objects.length - 1; curMarker = null;
+    buildObjectList(); buildObjInspector(); buildMarkerList(); draw();
+    status('Objekt geladen: ' + img.naturalWidth + '×' + img.naturalHeight + 'px (' + tw + '×' + th + ' Tiles). Auf die Karte klicken zum Platzieren.');
+  };
+  img.onerror = () => status('<span class="err">Objekt-Bild konnte nicht geladen werden.</span>');
+  img.src = URL.createObjectURL(f);
+  e.target.value = '';
+};
+
+// ================= Save / Load =================
+function loadStore() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; } }
+function saveStore(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function saveRoom() {
+  const name = prompt('Raum speichern als:', sanitizeName($('roomName').value)); if (!name) return;
+  const store = loadStore();
+  store[name] = {
+    cols, rows,
+    layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
+    markers, markerOrder,
+    defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
+    palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
+    objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
+    tilesSrc: tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src && tileset.img.src.startsWith('data:') ? tileset.img.src : null),
+    ts: Date.now()
+  };
+  saveStore(store); status('<span class="ok">Gespeichert: ' + name + '</span>');
+}
+function openLoad() {
+  const store = loadStore(); const names = Object.keys(store).sort(); const box = $('loadList'); box.innerHTML = '';
+  if (!names.length) box.innerHTML = '<div class="hint">Noch keine gespeicherten Räume in diesem Browser.</div>';
+  names.forEach(name => {
+    const d = store[name];
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line)';
+    row.innerHTML = '<b style="font-family:ui-monospace,monospace">' + name + '</b><span class="hint">' + d.cols + '×' + d.rows + '</span><span class="hint">' + new Date(d.ts || 0).toLocaleString() + '</span>';
+    const sp = document.createElement('span'); sp.style.flex = '1'; row.appendChild(sp);
+    const bL = document.createElement('button'); bL.textContent = 'Laden'; bL.className = 'primary';
+    bL.onclick = () => { loadRoom(name, d); $('loadDlg').close(); };
+    const bD = document.createElement('button'); bD.textContent = 'Löschen';
+    bD.onclick = () => { if (confirm('„' + name + '“ löschen?')) { const s = loadStore(); delete s[name]; saveStore(s); openLoad(); } };
+    row.appendChild(bL); row.appendChild(bD); box.appendChild(row);
+  });
+  $('loadDlg').showModal();
+}
+function loadRoom(name, d) {
+  cols = d.cols; rows = d.rows;
+  layers = d.layers.map(l => l.map(s => s.split('').map(ch => ch === ' ' ? null : ch)));
+  if (layers.length < 3) while (layers.length < 3) layers.push(blankLayer(cols, rows, null));
+  markers = d.markers || {}; markerOrder = d.markerOrder || Object.keys(markers);
+  if (d.defs) { tileset.defs = d.defs.map(x => ({ ...x })); tileset.tilesPerRow = d.tilesPerRow || 12; }
+  if (d.palettes) palettes = d.palettes.map(p => ({ name: p.name, hex: p.hex.slice(), rgb: p.hex.map(hexToRgb) }));
+  objects = (d.objects || []).map(o => ({ ...o, img: null }));
+  curObject = null;
+  objects.forEach(o => { if (o.imgSrc) { const im = new Image(); im.onload = () => { o.img = im; draw(); }; im.src = o.imgSrc; } });
+  const finish = () => { rebuildChMap(); buildTileCache(); $('roomName').value = name; undoStack = []; syncSize(); buildPalette(); buildMarkerList(); buildObjectList(); buildObjInspector(); status('<span class="ok">Geladen: ' + name + '</span>'); };
+  if (d.tilesSrc) { const img = new Image(); img.onload = () => { tileset.img = img; tileset.count = tileset.defs.length; finish(); }; img.src = d.tilesSrc; }
+  else finish();
+}
+
+// ================= Paletten-Editor =================
+function openPalDlg() {
+  const box = $('palEdit'); box.innerHTML = '';
+  palettes.forEach((p, pi) => {
+    const row = document.createElement('div'); row.className = 'pe';
+    row.innerHTML = '<span class="idx">' + pi + '</span><input class="pn">' +
+      p.hex.map((h, ci) => '<input type="color" data-ci="' + ci + '" value="' + h + '">').join('');
+    const pn = row.querySelector('.pn'); pn.value = p.name; pn.onchange = () => { p.name = pn.value; refreshTitles(); };
+    row.querySelectorAll('input[type=color]').forEach(ci => {
+      ci.oninput = () => { const k = +ci.dataset.ci; p.hex[k] = ci.value; p.rgb[k] = hexToRgb(ci.value); buildTileCache(); draw(); drawSwatches(); buildInspector(); };
+    });
+    box.appendChild(row);
+  });
+  $('palDlg').showModal();
+}
+function resetPalettes() {
+  applyPreset(curPreset); openPalDlg();
+}
+// ---- Paletten-Presets (Dropdown) ----
+function fillPresetDropdown() {
+  const sel = $('palPreset'); sel.innerHTML = '';
+  PALETTE_PRESETS.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name; sel.appendChild(o); });
+  sel.value = curPreset;
+}
+function applyPreset(idx) {
+  curPreset = +idx; $('palPreset').value = curPreset;
+  palettes = presetPalettes(curPreset);
+  buildTileCache(); draw(); drawSwatches(); buildInspector();
+  if ($('palDlg').open) openPalDlg();
+  status('<span class="ok">Palette: ' + PALETTE_PRESETS[curPreset].name + '</span>');
+}
+
+// ---- Größe ändern (Inhalt bleibt erhalten) ----
+function resizeMap(nw, nh) {
+  const ng = blankLayer(nw, nh, '.'), n1 = blankLayer(nw, nh, null), n2 = blankLayer(nw, nh, null);
+  for (let r = 0; r < Math.min(rows, nh); r++) for (let c = 0; c < Math.min(cols, nw); c++) {
+    ng[r][c] = layers[0][r][c]; n1[r][c] = layers[1][r][c]; n2[r][c] = layers[2][r][c];
+  }
+  layers = [ng, n1, n2]; cols = nw; rows = nh; undoStack = []; syncSize();
+}
+function changeSize() {
+  const w = parseInt(prompt('Breite (Tiles, 1–64):', String(cols)) || '', 10); if (!w) return;
+  const h = parseInt(prompt('Höhe (Tiles, 1–64):', String(rows)) || '', 10); if (!h) return;
+  const cw = Math.max(1, Math.min(64, w)), ch = Math.max(1, Math.min(64, h));
+  resizeMap(cw, ch); status('Größe: ' + cw + '×' + ch + ' (Inhalt erhalten).');
+}
+
+// ---- Karte als fertiges PNG rendern (Tiles + Objekte, kein Gitter) ----
+function renderMapPNG(scale) {
+  const c = document.createElement('canvas'); c.width = cols * SRC * scale; c.height = rows * SRC * scale;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  for (let r = 0; r < rows; r++) for (let cc = 0; cc < cols; cc++) {
+    for (let li = 0; li < 3; li++) {
+      const ch = layers[li][r][cc]; if (ch == null) continue;
+      const idx = chToIdx[ch]; if (idx == null) continue;
+      const dx = cc * SRC * scale, dy = r * SRC * scale, ds = SRC * scale;
+      if (recolor && tileCache[idx]) g.drawImage(tileCache[idx], 0, 0, SRC, SRC, dx, dy, ds, ds);
+      else { const [sx, sy] = srcXY(idx); g.drawImage(tileset.img, sx, sy, SRC, SRC, dx, dy, ds, ds); }
+    }
+  }
+  objects.forEach(o => { if (o.img) g.drawImage(o.img, 0, 0, o.img.naturalWidth, o.img.naturalHeight, o.x * SRC * scale, o.y * SRC * scale, o.tw * SRC * scale, o.th * SRC * scale); });
+  return c.toDataURL('image/png');
+}
+function exportPNG() {
+  const s = Math.max(1, Math.min(16, parseInt(prompt('Skalierung (1–16 ×, 1 = 8px pro Tile):', '4') || '', 10) || 4));
+  download(sanitizeName($('roomName').value).toLowerCase() + '.png', null, renderMapPNG(s));
+  status('<span class="ok">PNG gerendert (' + (cols * SRC * s) + '×' + (rows * SRC * s) + 'px).</span>');
+}
+
+// ================= Blatt-Import (RPG-Maker-Stil) =================
+let sheetImg = null, sheetData = null, sheetW = 0, sheetH = 0, sheetZoom = 2;
+let sheetSel = null, sheetDrag = false, sheetPending = null;
+
+function transpRgbOrNull() { return $('sheetTranspOn').checked ? hexToRgb($('sheetTransp').value) : null; }
+function openSheetDlg() { $('sheetRegionBar').style.display = 'none'; sheetPending = null; $('sheetDlg').showModal(); if (sheetImg) drawSheet(); }
+function loadSheet(file) {
+  const img = new Image();
+  img.onload = () => {
+    sheetImg = img; sheetW = img.naturalWidth; sheetH = img.naturalHeight;
+    const oc = document.createElement('canvas'); oc.width = sheetW; oc.height = sheetH;
+    const g = oc.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0);
+    try { sheetData = g.getImageData(0, 0, sheetW, sheetH).data; } catch (_) { sheetData = null; }
+    sheetSel = null; drawSheet();
+    status('Blatt geladen: ' + sheetW + '×' + sheetH + 'px. Rechtsklick setzt die Transparenzfarbe.');
+  };
+  img.onerror = () => status('<span class="err">Blatt konnte nicht geladen werden.</span>');
+  img.src = URL.createObjectURL(file);
+}
+function drawSheet() {
+  const c = $('sheetCv'); if (!sheetImg) return;
+  sheetZoom = +$('sheetZoom').value || 2;
+  c.width = sheetW * sheetZoom; c.height = sheetH * sheetZoom;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, c.width, c.height); g.drawImage(sheetImg, 0, 0, c.width, c.height);
+  const z = SRC * sheetZoom;
+  g.strokeStyle = '#00000040'; g.lineWidth = 1; g.beginPath();
+  for (let x = 0; x <= sheetW; x += SRC) { g.moveTo(x * sheetZoom + .5, 0); g.lineTo(x * sheetZoom + .5, c.height); }
+  for (let y = 0; y <= sheetH; y += SRC) { g.moveTo(0, y * sheetZoom + .5); g.lineTo(c.width, y * sheetZoom + .5); }
+  g.stroke();
+  if (sheetSel) {
+    const x0 = Math.min(sheetSel.x0, sheetSel.x1), y0 = Math.min(sheetSel.y0, sheetSel.y1);
+    const w = Math.abs(sheetSel.x1 - sheetSel.x0) + 1, h = Math.abs(sheetSel.y1 - sheetSel.y0) + 1;
+    g.fillStyle = '#7cc47c22'; g.fillRect(x0 * z, y0 * z, w * z, h * z);
+    g.strokeStyle = '#7cc47c'; g.lineWidth = 2; g.strokeRect(x0 * z + 1, y0 * z + 1, w * z - 2, h * z - 2);
+  }
+}
+function sheetCell(e) {
+  const r = $('sheetCv').getBoundingClientRect(), z = SRC * sheetZoom;
+  const x = Math.floor((e.clientX - r.left) / z), y = Math.floor((e.clientY - r.top) / z);
+  const mx = Math.ceil(sheetW / SRC) - 1, my = Math.ceil(sheetH / SRC) - 1;
+  return { x: Math.max(0, Math.min(mx, x)), y: Math.max(0, Math.min(my, y)) };
+}
+function commitSingleTile(cell) {
+  const idx = addTileFromRegion(sheetData, sheetW, cell.x * SRC, cell.y * SRC, transpRgbOrNull());
+  if (idx == null) { status('Zelle ist leer/transparent.'); return; }
+  tilesReady = true; buildTileCache(); curTile = idx; curStamp = null;
+  buildPalette(); refreshPalSel(); draw();
+  status('<span class="ok">Tile übernommen (#' + idx + ').</span>');
+}
+function makeStamp(x0, y0, w, h) {
+  const tiles = [];
+  for (let dy = 0; dy < h; dy++) { const row = [];
+    for (let dx = 0; dx < w; dx++) {
+      const idx = addTileFromRegion(sheetData, sheetW, (x0 + dx) * SRC, (y0 + dy) * SRC, transpRgbOrNull());
+      row.push(idx == null ? null : tileset.defs[idx].ch);
+    }
+    tiles.push(row);
+  }
+  tilesReady = true; buildTileCache();
+  curStamp = { w, h, tiles }; curTile = -2; curObject = null;
+  buildPalette(); draw();
+  status('<span class="ok">Stempel ' + w + '×' + h + ' bereit — auf die Karte klicken (aktive Tile-Ebene).</span>');
+  $('sheetDlg').close();
+}
+function makeObjectFromRegion(x0, y0, w, h) {
+  const pw = w * SRC, ph = h * SRC;
+  const oc = document.createElement('canvas'); oc.width = pw; oc.height = ph;
+  const g = oc.getContext('2d'); const id = g.createImageData(pw, ph); const transp = transpRgbOrNull();
+  for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
+    const si = ((y0 * SRC + y) * sheetW + (x0 * SRC + x)) * 4, oi = (y * pw + x) * 4;
+    let r = sheetData[si], gg = sheetData[si+1], b = sheetData[si+2], a = sheetData[si+3];
+    if (transp && a > 0 && colorClose(r, gg, b, transp)) a = 0;
+    id.data[oi] = r; id.data[oi+1] = gg; id.data[oi+2] = b; id.data[oi+3] = a;
+  }
+  g.putImageData(id, 0, 0);
+  const src = oc.toDataURL('image/png'); const im = new Image();
+  im.onload = () => {
+    pushUndo();
+    objects.push({ name: 'obj' + (objects.length + 1), x: 1, y: 1, tw: w, th: h, console: 'Frei', img: im, imgSrc: src });
+    curObject = objects.length - 1; curMarker = null; curStamp = null;
+    if (activeLayer !== 'events') setActiveLayer('events'); else { buildObjectList(); buildObjInspector(); draw(); }
+    status('<span class="ok">Objekt aus Region (' + pw + '×' + ph + 'px). Auf die Karte klicken.</span>');
+  };
+  im.src = src;
+  $('sheetDlg').close();
+}
+// Region-Pixel (mit Farbschlüssel) → PNG-DataURL
+function regionDataURL(tx0, ty0, tw, th, transp) {
+  const pw = tw * SRC, ph = th * SRC;
+  const oc = document.createElement('canvas'); oc.width = pw; oc.height = ph;
+  const g = oc.getContext('2d'); const id = g.createImageData(pw, ph);
+  for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
+    const si = ((ty0 * SRC + y) * sheetW + (tx0 * SRC + x)) * 4, oi = (y * pw + x) * 4;
+    let r = sheetData[si], gg = sheetData[si+1], b = sheetData[si+2], a = sheetData[si+3];
+    if (transp && a > 0 && colorClose(r, gg, b, transp)) a = 0;
+    id.data[oi] = r; id.data[oi+1] = gg; id.data[oi+2] = b; id.data[oi+3] = a;
+  }
+  g.putImageData(id, 0, 0); return oc.toDataURL('image/png');
+}
+// Zusammenhängende Formen (durch Transparenzfarbe getrennt) finden → je ein Objekt
+function autoDetectObjects() {
+  if (!sheetData) { status('Erst ein Blatt laden.'); return; }
+  const transp = transpRgbOrNull();
+  const W = sheetW, H = sheetH, solid = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    let s = sheetData[i * 4 + 3] > 16;
+    if (s && transp) s = !colorClose(sheetData[i*4], sheetData[i*4+1], sheetData[i*4+2], transp);
+    solid[i] = s ? 1 : 0;
+  }
+  const seen = new Uint8Array(W * H), stack = [], comps = [];
+  for (let p = 0; p < W * H; p++) {
+    if (!solid[p] || seen[p]) continue;
+    let minx = W, miny = H, maxx = 0, maxy = 0, cnt = 0;
+    stack.length = 0; stack.push(p); seen[p] = 1;
+    while (stack.length) {
+      const q = stack.pop(), qx = q % W, qy = (q / W) | 0;
+      if (qx < minx) minx = qx; if (qx > maxx) maxx = qx; if (qy < miny) miny = qy; if (qy > maxy) maxy = qy; cnt++;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue; const nx = qx + dx, ny = qy + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const np = ny * W + nx; if (solid[np] && !seen[np]) { seen[np] = 1; stack.push(np); }
+      }
+    }
+    comps.push({ minx, miny, maxx, maxy, cnt });
+  }
+  const found = [];
+  comps.forEach(c => {
+    const tx0 = Math.floor(c.minx / SRC), ty0 = Math.floor(c.miny / SRC);
+    const tw = Math.floor(c.maxx / SRC) - tx0 + 1, th = Math.floor(c.maxy / SRC) - ty0 + 1;
+    if (c.cnt < 6) return;                 // Streupixel
+    if (tw * th > 64 || tw > 12 || th > 12) return;   // zu groß → vermutlich Terrain
+    found.push({ tx0, ty0, tw, th });
+  });
+  if (!found.length) { status('<span class="warn">Keine getrennten Objekte gefunden — Transparenzfarbe gesetzt? (Rechtsklick aufs Blatt)</span>'); return; }
+  pushUndo();
+  let px = 0, py = 0, rowH = 0;
+  found.forEach((o, k) => {
+    if (px + o.tw > cols) { px = 0; py += rowH + 1; rowH = 0; }
+    const ox = px, oy = py; rowH = Math.max(rowH, o.th); px += o.tw + 1;
+    const src = regionDataURL(o.tx0, o.ty0, o.tw, o.th, transp);
+    const im = new Image(); im.onload = () => draw(); im.src = src;
+    objects.push({ name: 'obj' + (objects.length + 1), x: ox, y: oy, tw: o.tw, th: o.th, console: 'Frei', img: im, imgSrc: src });
+  });
+  curObject = objects.length - 1; curMarker = null; curStamp = null;
+  setActiveLayer('events');
+  status('<span class="ok">' + found.length + ' Objekte erkannt und platziert (verschiebbar).</span>');
+  $('sheetDlg').close();
+}
+
+// ================= misc =================
+function status(html) { $('status').innerHTML = html; }
+function newRoom() {
+  const w = parseInt(prompt('Breite (Tiles, 1–32):', String(cols)) || '', 10); if (!w) return;
+  const h = parseInt(prompt('Höhe (Tiles, 1–32):', String(rows)) || '', 10); if (!h) return;
+  const cw = Math.max(1, Math.min(32, w)), ch = Math.max(1, Math.min(32, h));
+  if (cw !== w || ch !== h) alert('Auf ' + cw + '×' + ch + ' begrenzt (max 32×32).');
+  newMap(cw, ch); status('Neuer Raum ' + cw + '×' + ch + '.');
+}
+
+// ================= Wire up =================
+$('btnUndo').onclick = undo;
+$('chkGrid').onchange = e => { showGrid = e.target.checked; draw(); };
+$('chkDim').onchange = e => { dimOthers = e.target.checked; draw(); };
+$('chkRecolor').onchange = e => { recolor = e.target.checked; draw(); drawSwatches(); buildInspector(); };
+$('btnPalettes').onclick = openPalDlg;
+$('palPreset').onchange = e => applyPreset(e.target.value);
+$('btnResize').onclick = changeSize;
+$('btnPng').onclick = exportPNG;
+$('btnClosePal').onclick = () => $('palDlg').close();
+$('btnPalReset').onclick = resetPalettes;
+$('btnNew').onclick = newRoom;
+$('btnSave').onclick = saveRoom;
+$('btnLoad').onclick = openLoad;
+$('btnCheck').onclick = checkBorder;
+$('btnExport').onclick = openExport;
+$('btnUpload').onclick = () => $('fileInput').click();
+$('btnAddObject').onclick = () => $('objFile').click();
+$('btnSheet').onclick = openSheetDlg;
+$('sheetClose').onclick = () => $('sheetDlg').close();
+$('sheetPick').onclick = () => $('sheetFile').click();
+$('sheetAuto').onclick = autoDetectObjects;
+$('sheetFile').onchange = e => { const f = e.target.files[0]; if (f) loadSheet(f); e.target.value = ''; };
+$('sheetZoom').onchange = drawSheet;
+$('sheetStamp').onclick = () => { if (sheetPending) makeStamp(sheetPending.x0, sheetPending.y0, sheetPending.w, sheetPending.h); };
+$('sheetObject').onclick = () => { if (sheetPending) makeObjectFromRegion(sheetPending.x0, sheetPending.y0, sheetPending.w, sheetPending.h); };
+(() => {
+  const scv = $('sheetCv');
+  scv.addEventListener('contextmenu', e => {
+    e.preventDefault(); if (!sheetData) return;
+    const r = scv.getBoundingClientRect();
+    const px = Math.floor((e.clientX - r.left) / sheetZoom), py = Math.floor((e.clientY - r.top) / sheetZoom);
+    if (px < 0 || py < 0 || px >= sheetW || py >= sheetH) return;
+    const si = (py * sheetW + px) * 4;
+    const hex = '#' + [sheetData[si], sheetData[si+1], sheetData[si+2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    $('sheetTransp').value = hex; $('sheetTranspOn').checked = true;
+    status('Transparenzfarbe: ' + hex);
+  });
+  scv.addEventListener('mousedown', e => { if (e.button !== 0 || !sheetData) return; const c = sheetCell(e); sheetDrag = true; sheetSel = { x0: c.x, y0: c.y, x1: c.x, y1: c.y }; $('sheetRegionBar').style.display = 'none'; drawSheet(); });
+  scv.addEventListener('mousemove', e => { if (!sheetDrag) return; const c = sheetCell(e); sheetSel.x1 = c.x; sheetSel.y1 = c.y; drawSheet(); });
+  window.addEventListener('mouseup', () => {
+    if (!sheetDrag) return; sheetDrag = false; if (!sheetSel) return;
+    const x0 = Math.min(sheetSel.x0, sheetSel.x1), y0 = Math.min(sheetSel.y0, sheetSel.y1);
+    const w = Math.abs(sheetSel.x1 - sheetSel.x0) + 1, h = Math.abs(sheetSel.y1 - sheetSel.y0) + 1;
+    if (w === 1 && h === 1) { commitSingleTile({ x: x0, y: y0 }); sheetSel = null; drawSheet(); }
+    else { sheetPending = { x0, y0, w, h }; $('sheetRegionInfo').textContent = 'Region ' + w + '×' + h + ' Tiles (' + (w * SRC) + '×' + (h * SRC) + 'px)'; $('sheetRegionBar').style.display = 'flex'; }
+  });
+})();
+$('btnCloseExport').onclick = () => $('exportDlg').close();
+$('btnCloseLoad').onclick = () => $('loadDlg').close();
+$('chkLegend').onchange = () => { $('exportText').value = mapToText(); };
+$('btnCopyTxt').onclick = () => copy(mapToText(), 'Text kopiert.');
+$('btnDownloadTxt').onclick = () => download(sanitizeName($('roomName').value).toLowerCase() + '.txt', mapToText());
+$('btnCArray').onclick = () => { const c = mapToCArray(); $('exportText').value = c; copy(c, 'C-Array kopiert.'); };
+$('btnJsonSave').onclick = () => exportJSON(false);
+$('btnJsonCopy').onclick = () => exportJSON(true);
+$('btnAddMarker').onclick = () => {
+  const n = $('newMarker').value.trim().replace(/\s+/g, '_'); if (!n) return;
+  if (!markerOrder.includes(n)) markerOrder.push(n);
+  curMarker = n; $('newMarker').value = ''; buildMarkerList();
+};
+window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); } });
+
+tileset.img.onload = () => { tilesReady = true; rebuildChMap(); buildTileCache(); buildPalette(); draw(); };
+tileset.img.onerror = () => status('<span class="err">Tileset konnte nicht geladen werden.</span>');
+tileset.img.src = BUILTIN_PNG;
+
+// ================= Init =================
+newMap(20, 18);
+fillPresetDropdown();
+buildLayerList(); buildPalette(); buildMarkerList();
+setActiveLayer(0);

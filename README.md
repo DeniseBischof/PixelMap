@@ -1,12 +1,21 @@
 # PixelMap
 
 Ein bewusst simpler Tile-Map-Editor für Pixel-/Retro-Spiele — Tile-Palette links,
-Klick-Leinwand rechts, sonst nichts. Läuft als **einzelne HTML-Datei** offline im
-Browser, keine Installation, keine Abhängigkeiten.
+Klick-Leinwand rechts, sonst nichts. Läuft offline im Browser, kein Build,
+keine Abhängigkeiten.
 
 ## Benutzen
 
 `index.html` doppelklicken — fertig. (Oder über GitHub Pages öffnen.)
+
+## Dateien
+
+- `index.html` — Struktur (Header, Panels, Dialoge)
+- `styles.css` — das gesamte Aussehen
+- `app.js` — die komplette Logik (mit `// ===` Abschnitts-Bannern: Tileset, Paletten,
+  Rendering, Ebenen, Blatt-Import, Export …)
+
+Drei Dateien, kein Build-Schritt — einfach die drei zusammen ausliefern/pushen.
 
 ## Was es kann
 
