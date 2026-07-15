@@ -15,13 +15,17 @@
     <label class="field"><input type="checkbox" id="chkGrid" checked> Gitter</label>
     <label class="field"><input type="checkbox" id="chkDim" checked> andere Ebenen abdunkeln</label>
     <label class="field"><input type="checkbox" id="chkRecolor" checked> GBC-Farben</label>
+    <label class="field" title="Hell/Dunkel-Stufen tauschen"><input type="checkbox" id="chkInvert"> Invertieren</label>
     <label class="field">Palette <select id="palPreset"></select></label>
     <button id="btnPalettes" title="Farben feinjustieren">Feintuning…</button>
     <span style="width:1px;height:20px;background:var(--line)"></span>
     <button id="btnNew">Neu</button>
     <button id="btnResize" title="Größe ändern, Inhalt bleibt">Größe…</button>
-    <button id="btnSave">Speichern</button>
-    <button id="btnLoad">Laden</button>
+    <button id="btnSave" title="Schnellspeichern im Browser (localStorage)">Speichern</button>
+    <button id="btnLoad" title="Aus dem Browser laden">Laden</button>
+    <button id="btnProjSave" title="Projekt als Datei sichern — mit allen Grafiken, zum Weitermachen/Teilen">Projekt ↓</button>
+    <button id="btnProjOpen" title="Projektdatei öffnen und weiterarbeiten">Projekt ↑</button>
+    <input type="file" id="projFile" accept="application/json,.json" style="display:none">
     <span style="width:1px;height:20px;background:var(--line)"></span>
     <label class="field">Name <input type="text" id="roomName" value="ROOM" style="width:110px"></label>
     <button id="btnCheck">Rand prüfen</button>

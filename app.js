@@ -41,17 +41,24 @@ const PALETTE_PRESETS = [
     ['#ffccaa','#ab5236','#5f574f','#000000'], ['#00e436','#008751','#1d2b53','#000000'],
     ['#ff77a8','#ff004d','#7e2553','#1d2b53'], ['#fff1e8','#c2c3c7','#5f574f','#000000'] ] },
   // Beliebte 4-Farben-Paletten (Lospec) — je Slot dieselbe Rampe (monochrom-thematisch)
-  { name: 'Game Boy (DMG)',   pals: Array(8).fill(['#9bbc0f','#77a112','#3b6a20','#0f380f']) },
-  { name: 'Kirokaze GB',      pals: Array(8).fill(['#e2f3e4','#94e344','#46878f','#332c50']) },
-  { name: 'Ice Cream GB',     pals: Array(8).fill(['#fff6d3','#f9a875','#eb6b6f','#7c3f58']) },
-  { name: 'Mist GB',          pals: Array(8).fill(['#c4f0c2','#5ab9a8','#1e606e','#2d1b00']) },
-  { name: 'Rustic GB',        pals: Array(8).fill(['#edb4a1','#a86868','#764462','#2c2137']) },
-  { name: 'Spacehaze GB',     pals: Array(8).fill(['#f8e3c4','#cc3495','#6b1fb1','#0b0630']) },
-  { name: 'Hollow',           pals: Array(8).fill(['#fafbf6','#c6b7be','#565a75','#0f0f1b']) },
-  { name: '2-Bit Demichrome', pals: Array(8).fill(['#e9efec','#a0a08b','#555568','#211e20']) },
-  { name: 'CGA',              pals: Array(8).fill(['#ffffff','#55ffff','#ff55ff','#000000']) },
-  { name: 'Graustufen',       pals: Array(8).fill(['#e8e8e8','#a0a0a0','#585858','#181818']) },
+  { name: 'Game Boy (DMG)',   pals: monoVaried(['#9bbc0f','#77a112','#3b6a20','#0f380f']) },
+  { name: 'Kirokaze GB',      pals: monoVaried(['#e2f3e4','#94e344','#46878f','#332c50']) },
+  { name: 'Ice Cream GB',     pals: monoVaried(['#fff6d3','#f9a875','#eb6b6f','#7c3f58']) },
+  { name: 'Mist GB',          pals: monoVaried(['#c4f0c2','#5ab9a8','#1e606e','#2d1b00']) },
+  { name: 'Rustic GB',        pals: monoVaried(['#edb4a1','#a86868','#764462','#2c2137']) },
+  { name: 'Spacehaze GB',     pals: monoVaried(['#f8e3c4','#cc3495','#6b1fb1','#0b0630']) },
+  { name: 'Hollow',           pals: monoVaried(['#fafbf6','#c6b7be','#565a75','#0f0f1b']) },
+  { name: '2-Bit Demichrome', pals: monoVaried(['#e9efec','#a0a08b','#555568','#211e20']) },
+  { name: 'CGA',              pals: monoVaried(['#ffffff','#55ffff','#ff55ff','#000000']) },
+  { name: 'Graustufen',       pals: monoVaried(['#e8e8e8','#a0a0a0','#585858','#181818']) },
 ];
+// Mono-Palette (1 Rampe) → 8 variierte Slots: Wasser/Stein/Laub bekommen die umgekehrte
+// Stufen-Reihenfolge (dunkle Basis), damit sich Tiles unterscheiden statt alle gleich zu sein.
+function monoVaried(r) {
+  const rev = [r[3], r[2], r[1], r[0]];
+  //       Gras Wasser Erde Stein Holz Laub Blüten Neutral
+  return [r,  rev,   r,   rev,  r,   rev, r,     r];
+}
 function presetPalettes(idx) {
   return PALETTE_PRESETS[idx].pals.map((hex, i) => ({ name: PAL_SLOTS[i], hex: hex.slice(), rgb: hex.map(hexToRgb) }));
 }
@@ -87,6 +94,7 @@ let curStamp = null;           // {w,h,tiles:[[char|null]]} — Mehrfach-Tile-Pi
 let curMarker = null;
 let showGrid = true, dimOthers = true;
 let recolor = true;            // GBC-Farben: Tiles auf 4 Stufen quantisieren + Palette einfärben
+let invert = false;            // Hell/Dunkel-Stufen tauschen (invertierte Palette)
 let undoStack = [];
 
 let tileset = { img: new Image(), tilesPerRow: 12, count: 12, defs: BUILTIN_DEFS.map(d => ({ ...d })) };
@@ -189,7 +197,8 @@ function buildTileCache() {
       const a = data[si + 3];
       if (a < 128) { out.data[oi + 3] = 0; continue; }
       const lum = 0.299 * data[si] + 0.587 * data[si + 1] + 0.114 * data[si + 2];
-      const q = lum >= 192 ? 0 : lum >= 128 ? 1 : lum >= 64 ? 2 : 3;   // hell→dunkel = Index 0→3
+      let q = lum >= 192 ? 0 : lum >= 128 ? 1 : lum >= 64 ? 2 : 3;   // hell→dunkel = Index 0→3
+      if (invert) q = 3 - q;                                          // Stufen tauschen
       out.data[oi] = pal[q][0]; out.data[oi + 1] = pal[q][1]; out.data[oi + 2] = pal[q][2]; out.data[oi + 3] = 255;
     }
     g.putImageData(out, 0, 0); tileCache[i] = c;
@@ -756,6 +765,38 @@ function loadRoom(name, d) {
   else finish();
 }
 
+// ---- Projektdatei: kompletter Editor-Zustand inkl. aller Grafiken (base64), portabel ----
+function buildProject() {
+  return {
+    format: 'pixelmap-project', version: 1,
+    name: sanitizeName($('roomName').value), curPreset,
+    cols, rows,
+    layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
+    markers, markerOrder,
+    defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
+    palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
+    objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
+    tilesSrc: tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src && tileset.img.src.startsWith('data:') ? tileset.img.src : null),
+    ts: Date.now()
+  };
+}
+function exportProject() {
+  const p = buildProject();
+  download(p.name.toLowerCase() + '.pixelmap.json', JSON.stringify(p));
+  status('<span class="ok">Projekt gesichert (mit allen Grafiken) — später per „Projekt ↑" weiterarbeiten.</span>');
+}
+function importProjectFile(file) {
+  const rd = new FileReader();
+  rd.onload = () => {
+    let d; try { d = JSON.parse(rd.result); } catch (_) { status('<span class="err">Keine gültige Projektdatei (kein JSON).</span>'); return; }
+    if (!d.layers || !d.cols) { status('<span class="err">Datei ist keine PixelMap-Projektdatei.</span>'); return; }
+    if (d.curPreset != null) { curPreset = d.curPreset; $('palPreset').value = curPreset; }
+    loadRoom(d.name || 'Projekt', d);
+  };
+  rd.onerror = () => status('<span class="err">Datei konnte nicht gelesen werden.</span>');
+  rd.readAsText(file);
+}
+
 // ================= Paletten-Editor =================
 function openPalDlg() {
   const box = $('palEdit'); box.innerHTML = '';
@@ -990,6 +1031,7 @@ $('btnUndo').onclick = undo;
 $('chkGrid').onchange = e => { showGrid = e.target.checked; draw(); };
 $('chkDim').onchange = e => { dimOthers = e.target.checked; draw(); };
 $('chkRecolor').onchange = e => { recolor = e.target.checked; draw(); drawSwatches(); buildInspector(); };
+$('chkInvert').onchange = e => { invert = e.target.checked; buildTileCache(); draw(); drawSwatches(); buildInspector(); };
 $('btnPalettes').onclick = openPalDlg;
 $('palPreset').onchange = e => applyPreset(e.target.value);
 $('btnResize').onclick = changeSize;
@@ -999,6 +1041,9 @@ $('btnPalReset').onclick = resetPalettes;
 $('btnNew').onclick = newRoom;
 $('btnSave').onclick = saveRoom;
 $('btnLoad').onclick = openLoad;
+$('btnProjSave').onclick = exportProject;
+$('btnProjOpen').onclick = () => $('projFile').click();
+$('projFile').onchange = e => { const f = e.target.files[0]; if (f) importProjectFile(f); e.target.value = ''; };
 $('btnCheck').onclick = checkBorder;
 $('btnExport').onclick = openExport;
 $('btnUpload').onclick = () => $('fileInput').click();
