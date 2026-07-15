@@ -67,10 +67,10 @@ let curPreset = 0;
 const CHAR_POOL = '.#DOTFBCHSEPabcdefghijklmnopqrstuvwxyz0123456789+*=~^%&@$';
 
 const CELL = 24, SRC = 8;
-const LS_KEY = 'smalldurs_rooms_v2';
+const LS_KEY = 'pixelmap_rooms_v1', LS_KEY_OLD = 'smalldurs_rooms_v2';   // alter Schlüssel wird einmalig migriert
 const LAYER_NAMES = ['Boden', 'Objekt 1', 'Objekt 2'];
-const DEFAULT_MARKERS = ['start', 'laezel', 'us', 'shadow', 'rune', 'helm'];
-const MARKER_COLORS = { start:'#6cc46c', laezel:'#c46c9a', us:'#6c9ac4', shadow:'#8a6cc4', rune:'#c4a24a', helm:'#c46c6c' };
+const DEFAULT_MARKERS = ['start', 'tuer', 'npc', 'truhe', 'ziel'];
+const MARKER_COLORS = { start:'#6cc46c', tuer:'#c4a24a', npc:'#6c9ac4', truhe:'#c46c9a', ziel:'#c46c6c' };
 // Sprite-Größen, sortiert nach Konsole (px). Tile-Footprint = w/8 × h/8.
 const SPRITE_SIZES = [
   { console: 'Game Boy',   list: [[8,8],[8,16],[16,16],[16,24],[24,24],[32,32],[32,48]] },
@@ -396,7 +396,6 @@ function refreshTitles() {
 // ================= Markers UI =================
 function buildMarkerList() {
   const box = $('markerList'); if (!box) return; box.innerHTML = '';
-  const names = markerOrder.length ? markerOrder : [];
   // stelle sicher, dass die Standard-Namen anwählbar sind
   DEFAULT_MARKERS.forEach(n => { if (!markerOrder.includes(n)) markerOrder.push(n); });
   markerOrder.forEach(name => {
@@ -451,7 +450,7 @@ function buildObjInspector() {
   nm.onchange = () => { o.name = nm.value.trim() || o.name; buildObjectList(); draw(); };
   box.querySelector('#objSize').onchange = e => {
     const v = e.target.value;
-    if (v === 'free') { o.console = 'Frei'; o.tw = Math.max(1, Math.ceil(o.img.naturalWidth / SRC)); o.th = Math.max(1, Math.ceil(o.img.naturalHeight / SRC)); }
+    if (v === 'free') { o.console = 'Frei'; if (o.img) { o.tw = Math.max(1, Math.ceil(o.img.naturalWidth / SRC)); o.th = Math.max(1, Math.ceil(o.img.naturalHeight / SRC)); } }
     else { const [cons, w, h] = v.split('|'); o.console = cons; o.tw = w / SRC; o.th = h / SRC; }
     draw(); buildObjectList(); buildObjInspector();
   };
@@ -716,7 +715,14 @@ $('objFile').onchange = e => {
 };
 
 // ================= Save / Load =================
-function loadStore() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; } }
+function loadStore() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY)); if (s) return s;
+    const old = JSON.parse(localStorage.getItem(LS_KEY_OLD));
+    if (old) { localStorage.setItem(LS_KEY, JSON.stringify(old)); return old; }
+    return {};
+  } catch { return {}; }
+}
 function saveStore(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 function saveRoom() {
   const name = prompt('Raum speichern als:', sanitizeName($('roomName').value)); if (!name) return;
@@ -727,6 +733,7 @@ function saveRoom() {
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
     palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
+    curPreset, invert,
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
     tilesSrc: tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src && tileset.img.src.startsWith('data:') ? tileset.img.src : null),
     ts: Date.now()
@@ -757,6 +764,8 @@ function loadRoom(name, d) {
   markers = d.markers || {}; markerOrder = d.markerOrder || Object.keys(markers);
   if (d.defs) { tileset.defs = d.defs.map(x => ({ ...x })); tileset.tilesPerRow = d.tilesPerRow || 12; }
   if (d.palettes) palettes = d.palettes.map(p => ({ name: p.name, hex: p.hex.slice(), rgb: p.hex.map(hexToRgb) }));
+  if (d.curPreset != null) { curPreset = d.curPreset; $('palPreset').value = curPreset; }   // nur Anzeige — Farben kommen aus d.palettes
+  if (d.invert != null) { invert = !!d.invert; $('chkInvert').checked = invert; }
   objects = (d.objects || []).map(o => ({ ...o, img: null }));
   curObject = null;
   objects.forEach(o => { if (o.imgSrc) { const im = new Image(); im.onload = () => { o.img = im; draw(); }; im.src = o.imgSrc; } });
@@ -769,7 +778,7 @@ function loadRoom(name, d) {
 function buildProject() {
   return {
     format: 'pixelmap-project', version: 1,
-    name: sanitizeName($('roomName').value), curPreset,
+    name: sanitizeName($('roomName').value), curPreset, invert,
     cols, rows,
     layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
     markers, markerOrder,
@@ -790,8 +799,7 @@ function importProjectFile(file) {
   rd.onload = () => {
     let d; try { d = JSON.parse(rd.result); } catch (_) { status('<span class="err">Keine gültige Projektdatei (kein JSON).</span>'); return; }
     if (!d.layers || !d.cols) { status('<span class="err">Datei ist keine PixelMap-Projektdatei.</span>'); return; }
-    if (d.curPreset != null) { curPreset = d.curPreset; $('palPreset').value = curPreset; }
-    loadRoom(d.name || 'Projekt', d);
+    loadRoom(d.name || 'Projekt', d);   // stellt auch curPreset/invert wieder her
   };
   rd.onerror = () => status('<span class="err">Datei konnte nicht gelesen werden.</span>');
   rd.readAsText(file);
@@ -1019,10 +1027,10 @@ function autoDetectObjects() {
 // ================= misc =================
 function status(html) { $('status').innerHTML = html; }
 function newRoom() {
-  const w = parseInt(prompt('Breite (Tiles, 1–32):', String(cols)) || '', 10); if (!w) return;
-  const h = parseInt(prompt('Höhe (Tiles, 1–32):', String(rows)) || '', 10); if (!h) return;
-  const cw = Math.max(1, Math.min(32, w)), ch = Math.max(1, Math.min(32, h));
-  if (cw !== w || ch !== h) alert('Auf ' + cw + '×' + ch + ' begrenzt (max 32×32).');
+  const w = parseInt(prompt('Breite (Tiles, 1–64):', String(cols)) || '', 10); if (!w) return;
+  const h = parseInt(prompt('Höhe (Tiles, 1–64):', String(rows)) || '', 10); if (!h) return;
+  const cw = Math.max(1, Math.min(64, w)), ch = Math.max(1, Math.min(64, h));
+  if (cw !== w || ch !== h) alert('Auf ' + cw + '×' + ch + ' begrenzt (max 64×64).');
   newMap(cw, ch); status('Neuer Raum ' + cw + '×' + ch + '.');
 }
 
