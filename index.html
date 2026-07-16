@@ -82,7 +82,32 @@
       <button id="btnJsonCopy">JSON kopieren</button>
       <button id="btnJsonSave" class="primary">JSON speichern</button>
       <button id="btnPng">Als PNG-Bild</button>
+      <button id="btnAssets" title="Gebackenes Tileset-PNG + Index-Karte als CSV — für gfx4snes/Unity/Tiled">Tileset-PNG + Map-CSV</button>
       <button id="btnCloseExport">Schließen</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="newDlg">
+  <div class="dlg-body">
+    <h2>Neues Projekt</h2>
+    <div class="section-title" style="margin-top:0">Tile-Größe</div>
+    <div id="sizeOpts">
+      <label class="sizeopt"><input type="radio" name="tsz" value="8" checked> <b>8×8</b><span class="use">Game Boy (GBDK) · NES · PICO-8 · Master System</span></label>
+      <label class="sizeopt"><input type="radio" name="tsz" value="16"> <b>16×16</b><span class="use">SNES (PVSnesLib) · RPG Maker 2003 · GBA · Mega Drive</span></label>
+      <label class="sizeopt"><input type="radio" name="tsz" value="32"> <b>32×32</b><span class="use">RPG Maker XP/VX · Unity · moderne Indie-Pixel-Games</span></label>
+      <label class="sizeopt"><input type="radio" name="tsz" value="48"> <b>48×48</b><span class="use">RPG Maker MV/MZ</span></label>
+    </div>
+    <div class="section-title">Kartengröße (Tiles)</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label class="field">Breite <input type="number" id="newW" min="1" max="64" value="20" style="width:64px"></label>
+      <label class="field">Höhe <input type="number" id="newH" min="1" max="64" value="18" style="width:64px"></label>
+      <span class="hint">max 64×64</span>
+    </div>
+    <div class="hint" style="margin-top:10px">Erstellt eine leere Karte. Die Basis-Tiles werden auf die gewählte Größe skaliert; eigene Tilesets/Blätter werden in dieser Größe geschnitten.</div>
+    <div class="dlg-actions">
+      <button id="newCancel">Abbrechen</button>
+      <button id="newCreate" class="primary">Erstellen</button>
     </div>
   </div>
 </dialog>

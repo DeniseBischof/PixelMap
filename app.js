@@ -66,7 +66,13 @@ let curPreset = 0;
 // Zeichen-Pool für hochgeladene Tiles jenseits der Standard-12
 const CHAR_POOL = '.#DOTFBCHSEPabcdefghijklmnopqrstuvwxyz0123456789+*=~^%&@$';
 
-const CELL = 24, SRC = 8;
+// Tile-Größe ist eine Projekt-Einstellung (im "Neu"-Dialog wählbar). CELL = Anzeigegröße auf der Leinwand.
+let SRC = 8, CELL = 24;
+function setTileSize(px) {
+  SRC = px;
+  CELL = px <= 8 ? 24 : px <= 16 ? 32 : 48;
+  srcCanvas = null;               // Offscreen-Puffer passt nicht mehr
+}
 const LS_KEY = 'pixelmap_rooms_v1', LS_KEY_OLD = 'smalldurs_rooms_v2';   // alter Schlüssel wird einmalig migriert
 const LAYER_NAMES = ['Boden', 'Objekt 1', 'Objekt 2'];
 const DEFAULT_MARKERS = ['start', 'tuer', 'npc', 'truhe', 'ziel'];
@@ -641,10 +647,19 @@ function jsonString() { return JSON.stringify(buildJSON(), null, 2); }
 function exportJSON(doCopy) {
   const j = buildJSON(); const s = JSON.stringify(j, null, 2);
   $('exportText').value = s.length > 40000 ? s.slice(0, 40000) + '\n… (' + (s.length - 40000) + ' Zeichen mehr; Datei enthält alles)' : s;
-  const warn = j.baked.count > 192 ? ' <span class="warn">⚠ ' + j.baked.count + ' gebackene Tiles > 192 (GB-Budget)</span>' : '';
+  const warn = (SRC === 8 && j.baked.count > 192) ? ' <span class="warn">⚠ ' + j.baked.count + ' gebackene Tiles > 192 (GB-Budget)</span>' : '';
   status('<span class="ok">JSON: ' + j.baked.count + ' gebackene Tiles, ' + j.objects.length + ' Objekte.</span>' + warn);
   if (doCopy) copy(s, 'JSON kopiert.');
   else download(sanitizeName($('roomName').value).toLowerCase() + '.json', s);
+}
+// Engine-Rohdaten: gebackenes Tileset als PNG + Karte als CSV (Tile-Indizes) —
+// das Format, das gfx4snes (PVSnesLib), Unity, Tiled & Co. direkt einlesen/umwandeln können.
+function exportAssets() {
+  const baked = bakeComposited();
+  const nm = sanitizeName($('roomName').value).toLowerCase();
+  download(nm + '_tiles.png', null, baked.image);
+  download(nm + '_map.csv', baked.map.map(r => r.join(',')).join('\n'));
+  status('<span class="ok">' + nm + '_tiles.png (' + baked.count + ' Tiles à ' + SRC + 'px, ' + baked.columns + '/Zeile) + ' + nm + '_map.csv gespeichert.</span>');
 }
 function download(fn, text, href) {
   const a = document.createElement('a');
@@ -728,7 +743,7 @@ function saveRoom() {
   const name = prompt('Raum speichern als:', sanitizeName($('roomName').value)); if (!name) return;
   const store = loadStore();
   store[name] = {
-    cols, rows,
+    cols, rows, tileSize: SRC,
     layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
@@ -758,6 +773,7 @@ function openLoad() {
   $('loadDlg').showModal();
 }
 function loadRoom(name, d) {
+  setTileSize(d.tileSize || 8);        // ältere Speicher waren immer 8×8
   cols = d.cols; rows = d.rows;
   layers = d.layers.map(l => l.map(s => s.split('').map(ch => ch === ' ' ? null : ch)));
   if (layers.length < 3) while (layers.length < 3) layers.push(blankLayer(cols, rows, null));
@@ -779,7 +795,7 @@ function buildProject() {
   return {
     format: 'pixelmap-project', version: 1,
     name: sanitizeName($('roomName').value), curPreset, invert,
-    cols, rows,
+    cols, rows, tileSize: SRC,
     layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
@@ -1027,11 +1043,21 @@ function autoDetectObjects() {
 // ================= misc =================
 function status(html) { $('status').innerHTML = html; }
 function newRoom() {
-  const w = parseInt(prompt('Breite (Tiles, 1–64):', String(cols)) || '', 10); if (!w) return;
-  const h = parseInt(prompt('Höhe (Tiles, 1–64):', String(rows)) || '', 10); if (!h) return;
-  const cw = Math.max(1, Math.min(64, w)), ch = Math.max(1, Math.min(64, h));
-  if (cw !== w || ch !== h) alert('Auf ' + cw + '×' + ch + ' begrenzt (max 64×64).');
-  newMap(cw, ch); status('Neuer Raum ' + cw + '×' + ch + '.');
+  $('newW').value = cols; $('newH').value = rows;
+  document.querySelectorAll('#sizeOpts input[name=tsz]').forEach(r => r.checked = +r.value === SRC);
+  $('newDlg').showModal();
+}
+function createRoom() {
+  const px = +([...document.querySelectorAll('#sizeOpts input[name=tsz]')].find(r => r.checked)?.value || 8);
+  const w = Math.max(1, Math.min(64, parseInt($('newW').value, 10) || 20));
+  const h = Math.max(1, Math.min(64, parseInt($('newH').value, 10) || 18));
+  setTileSize(px);
+  rebuildBuiltinAtlas();
+  tilesReady = true; buildTileCache();
+  newMap(w, h);
+  buildPalette();
+  $('newDlg').close();
+  status('Neues Projekt: ' + w + '×' + h + ' Tiles à ' + px + '×' + px + 'px.');
 }
 
 // ================= Wire up =================
@@ -1047,6 +1073,8 @@ $('btnPng').onclick = exportPNG;
 $('btnClosePal').onclick = () => $('palDlg').close();
 $('btnPalReset').onclick = resetPalettes;
 $('btnNew').onclick = newRoom;
+$('newCreate').onclick = createRoom;
+$('newCancel').onclick = () => $('newDlg').close();
 $('btnSave').onclick = saveRoom;
 $('btnLoad').onclick = openLoad;
 $('btnProjSave').onclick = exportProject;
@@ -1094,6 +1122,7 @@ $('btnDownloadTxt').onclick = () => download(sanitizeName($('roomName').value).t
 $('btnCArray').onclick = () => { const c = mapToCArray(); $('exportText').value = c; copy(c, 'C-Array kopiert.'); };
 $('btnJsonSave').onclick = () => exportJSON(false);
 $('btnJsonCopy').onclick = () => exportJSON(true);
+$('btnAssets').onclick = exportAssets;
 $('btnAddMarker').onclick = () => {
   const n = $('newMarker').value.trim().replace(/\s+/g, '_'); if (!n) return;
   if (!markerOrder.includes(n)) markerOrder.push(n);
@@ -1101,9 +1130,19 @@ $('btnAddMarker').onclick = () => {
 };
 window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); } });
 
-tileset.img.onload = () => { tilesReady = true; rebuildChMap(); buildTileCache(); buildPalette(); draw(); };
-tileset.img.onerror = () => status('<span class="err">Tileset konnte nicht geladen werden.</span>');
-tileset.img.src = BUILTIN_PNG;
+// Basis-Tiles laden und auf die aktuelle Tile-Größe skaliert in einen Atlas legen
+const builtinImg = new Image();
+function rebuildBuiltinAtlas() {
+  const a = document.createElement('canvas'); a.__atlas = true;
+  a.width = 12 * SRC; a.height = SRC;
+  const g = a.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.drawImage(builtinImg, 0, 0, 96, 8, 0, 0, 12 * SRC, SRC);   // 8×8-Quelle → SRC×SRC, pixelig skaliert
+  tileset = { img: a, tilesPerRow: 12, count: 12, defs: BUILTIN_DEFS.map(d => ({ ...d })) };
+  rebuildChMap(); rebuildTileHashes();
+}
+builtinImg.onload = () => { rebuildBuiltinAtlas(); tilesReady = true; buildTileCache(); buildPalette(); draw(); };
+builtinImg.onerror = () => status('<span class="err">Tileset konnte nicht geladen werden.</span>');
+builtinImg.src = BUILTIN_PNG;
 
 // ================= Init =================
 newMap(20, 18);
