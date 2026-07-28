@@ -110,6 +110,9 @@ let curTile = 0;               // Index in tiledefs, oder -1 = Radierer
 let curStamp = null;           // {w,h,tiles:[[char|null]]} — Mehrfach-Tile-Pinsel aus dem Blatt
 let autotileGroups = [];       // {name, mode, variants[]} using source-sheet order
 let curAutoTile = null;        // active autotile group index | null
+let tileAnimations = [];       // {name, frames[], frameMs}; map cells store frames[0]
+let tileSelection = [];        // ordered tile indices for animation/terrain composition
+let animationNow = 0;
 let curMarker = null;
 let showGrid = true, dimOthers = true;
 let recolor = true;            // GBC-Farben: Tiles auf 4 Stufen quantisieren + Palette einfärben
@@ -301,7 +304,20 @@ function getRecoloredTile(i) {
   }
 }
 // zeichnet Tile idx in ein Ziel-Rechteck (recolored oder roh)
-function drawTile(g, idx, dx, dy, dw, dh) {
+function animationForChar(ch) {
+  return tileAnimations.find(animation => animation.frames[0] === ch);
+}
+function tileAnimationForAnyFrame(ch) {
+  return tileAnimations.find(animation => animation.frames.includes(ch));
+}
+function animatedTileIndex(idx) {
+  const animation = animationForChar(tileset.defs[idx]?.ch);
+  if (!animation || animation.frames.length < 2) return idx;
+  const frame = Math.floor(animationNow / Math.max(80, animation.frameMs || 240)) % animation.frames.length;
+  return chToIdx[animation.frames[frame]] ?? idx;
+}
+function drawTile(g, idx, dx, dy, dw, dh, animate = true) {
+  if (animate) idx = animatedTileIndex(idx);
   const cached = recolor ? getRecoloredTile(idx) : null;
   if (cached) g.drawImage(cached, 0, 0, SRC, SRC, dx, dy, dw, dh);
   else { const [sx, sy] = srcXY(idx); g.drawImage(tileset.img, sx, sy, SRC, SRC, dx, dy, dw, dh); }
@@ -310,6 +326,24 @@ function requestDraw() {
   if (drawPending) return;
   drawPending = true;
   requestAnimationFrame(() => { drawPending = false; draw(); });
+}
+let lastAnimationSignature = '';
+function animationLoop(now) {
+  animationNow = now;
+  const signature = tileAnimations.map(animation =>
+    Math.floor(now / Math.max(80, animation.frameMs || 240)) % animation.frames.length
+  ).join(',');
+  if (tileAnimations.length && signature !== lastAnimationSignature) {
+    lastAnimationSignature = signature;
+    draw(); drawSwatches();
+    const preview = document.querySelector('#tileInspector .ipreview');
+    if (preview && curTile >= 0) {
+      const pg = preview.getContext('2d'); pg.imageSmoothingEnabled = false;
+      pg.clearRect(0, 0, preview.width, preview.height);
+      drawTile(pg, curTile, 0, 0, preview.width, preview.height);
+    }
+  }
+  requestAnimationFrame(animationLoop);
 }
 
 // ================= Map lifecycle =================
@@ -327,6 +361,7 @@ function newMap(w, h) {
   markers = {}; markerOrder = [];
   objects = []; curObject = null;
   autotileGroups = []; curAutoTile = null;
+  tileAnimations = []; tileSelection = [];
   undoStack = [];
   syncSize();
 }
@@ -417,6 +452,7 @@ function setActiveLayer(l) {
   $('tileInspector').style.display = l === 'events' ? 'none' : 'block';
   $('swatches').style.display = l === 'events' ? 'none' : 'grid';
   $('tilePager').style.display = l === 'events' ? 'none' : 'flex';
+  $('tileSelectionBar').style.display = l === 'events' ? 'none' : '';
   $('btnUpload').style.display = l === 'events' ? 'none' : 'block';
   buildLayerList(); buildPalette(); buildMarkerList(); buildObjectList(); buildObjInspector(); draw();
 }
@@ -440,6 +476,78 @@ function pageForTile(index) {
   const info = tilePageMetrics(0);
   return Math.floor(Math.floor(index / info.columns) / info.rowsPerPage);
 }
+function updateTileSelectionBar() {
+  const bar = $('tileSelectionBar'), count = tileSelection.length;
+  bar.hidden = count === 0;
+  $('tileSelectionCount').textContent = count + (count === 1 ? ' tile selected' : ' tiles selected');
+  $('btnMakeAnimation').disabled = count < 2;
+  $('btnMakeTerrain3').disabled = count !== 9;
+  $('btnMakeTerrain12').disabled = count !== 12;
+  $('btnMakeTerrain4').disabled = count !== 16;
+}
+function clearTileSelection(rebuild = true) {
+  tileSelection = [];
+  updateTileSelectionBar();
+  if (rebuild) buildPalette();
+}
+function toggleTileSelection(index) {
+  const existing = tileSelection.indexOf(index);
+  if (existing >= 0) tileSelection.splice(existing, 1);
+  else tileSelection.push(index);
+  updateTileSelectionBar(); drawSwatches();
+}
+function addTileAnimation(indices, name) {
+  const frames = indices.map(index => tileset.defs[index]?.ch).filter(Boolean);
+  if (frames.length !== indices.length || frames.length < 2) return false;
+  tileAnimations = tileAnimations.filter(animation => !animation.frames.some(ch => frames.includes(ch)));
+  tileAnimations.push({ name, frames, frameMs: 240 });
+  return true;
+}
+function makeAnimationFromSelection() {
+  if (tileSelection.length < 2 || tileSelection.some(index => tileset.defs[index]?.empty)) {
+    status('<span class="err">Select at least two non-empty frames in playback order.</span>');
+    return;
+  }
+  const indices = tileSelection.slice();
+  addTileAnimation(indices, (tileset.defs[indices[0]].name || 'Tile') + ' animation');
+  curTile = indices[0]; tilePage = pageForTile(curTile); curAutoTile = null;
+  clearTileSelection(false); buildPalette(); buildInspector();
+  status('<span class="ok">Created a ' + indices.length + '-frame tile animation.</span>');
+}
+function registerAutotileFromIndices(mode, indices, name) {
+  if (indices.some(index => !tileset.defs[index] || tileset.defs[index].empty)) {
+    status('<span class="err">The terrain selection contains an empty source cell.</span>');
+    return false;
+  }
+  const variants = indices.map(index => tileset.defs[index].ch);
+  autotileGroups = autotileGroups.filter(group => !group.variants.some(ch => variants.includes(ch)));
+  autotileGroups.push({ name, mode, variants });
+  curAutoTile = autotileGroups.length - 1;
+  curTile = indices[0]; curStamp = null;
+  return true;
+}
+function makeTerrainFromTileSelection(mode) {
+  const required = mode === 'nine-slice' ? 9 : mode === 'rpg12' ? 12 : 16;
+  if (tileSelection.length !== required) return;
+  const indices = tileSelection.slice();
+  if (mode === 'rpg12') {
+    for (const base of indices) {
+      const rootChar = tileset.defs[base]?.ch;
+      if (animationForChar(rootChar)) continue;
+      const col = base % tileset.tilesPerRow;
+      const frames = [base, base + 1, base + 2];
+      if (col + 2 >= tileset.tilesPerRow || frames.some(index => !tileset.defs[index] || tileset.defs[index].empty)) {
+        status('<span class="err">Each selected RPG tile needs two non-empty animation frames immediately to its right, or an animation created beforehand.</span>');
+        return;
+      }
+      addTileAnimation(frames, (tileset.defs[base].name || 'Water') + ' animation');
+    }
+  }
+  const label = mode === 'nine-slice' ? '3×3 terrain' : mode === 'rpg12' ? 'RPG 3×4 animated terrain' : '4×4 bitmask';
+  if (!registerAutotileFromIndices(mode, indices, label)) return;
+  clearTileSelection(false); buildPalette(); buildInspector();
+  status('<span class="ok">' + label + ' created and activated.</span>');
+}
 function updateTilePager() {
   const info = tilePageMetrics();
   tilePage = info.page;
@@ -454,6 +562,7 @@ function updateTilePager() {
 function buildPalette() {
   const box = $('swatches'); box.innerHTML = '';
   if (activeLayer === 'events') { buildInspector(); return; }
+  updateTileSelectionBar();
   updateTilePager();
   const info = tilePageMetrics();
   box.style.gridTemplateColumns = 'repeat(' + info.columns + ', 34px)';
@@ -462,10 +571,16 @@ function buildPalette() {
   for (let i = info.start; i < info.end; i++) {
     const d = tileset.defs[i];
     const sc = document.createElement('canvas');
-    sc.className = 'swatch' + (curTile === i ? ' sel' : '') + (d.empty ? ' empty' : '');
+    const animation = tileAnimationForAnyFrame(d.ch);
+    sc.className = 'swatch' + (curTile === i ? ' sel' : '') + (d.empty ? ' empty' : '') +
+      (tileSelection.includes(i) ? ' multi-selected' : '') +
+      (animation ? ' animation-frame' : '') + (animation?.frames[0] === d.ch ? ' animation-root' : '');
     sc.width = 34; sc.height = 34; sc.dataset.i = i;
     sc.title = d.empty ? 'Empty source cell' : (d.ch || '?') + ' · ' + d.name;
-    if (!d.empty) sc.onclick = () => { curTile = i; curStamp = null; curAutoTile = null; refreshPalSel(); buildInspector(); };
+    if (!d.empty) sc.onclick = event => {
+      if (event.ctrlKey || event.metaKey) { toggleTileSelection(i); return; }
+      curTile = i; curStamp = null; curAutoTile = null; refreshPalSel(); buildInspector();
+    };
     box.appendChild(sc);
   }
   drawSwatches();
@@ -479,6 +594,18 @@ function drawSwatches() {
     const g = sc.getContext('2d'); g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, 34, 34);
     drawTile(g, i, 0, 0, 34, 34);
+    const selectedOrder = tileSelection.indexOf(i);
+    if (selectedOrder >= 0) {
+      g.fillStyle = '#102333dd'; g.fillRect(1, 1, 13, 12);
+      g.fillStyle = '#8ed8ff'; g.font = 'bold 9px system-ui'; g.textBaseline = 'top';
+      g.fillText(String(selectedOrder + 1), 3, 2);
+    }
+    const animation = tileAnimationForAnyFrame(tileset.defs[i]?.ch);
+    if (animation && animation.frames[0] === tileset.defs[i].ch) {
+      g.fillStyle = '#24132cdd'; g.fillRect(17, 23, 16, 10);
+      g.fillStyle = '#e6a8ff'; g.font = 'bold 8px system-ui'; g.textBaseline = 'top';
+      g.fillText('▶' + animation.frames.length, 18, 24);
+    }
   });
 }
 function refreshPalSel() {
@@ -509,17 +636,24 @@ function createAutotileFromSelection(mode) {
     status('<span class="err">This block contains empty cells. Select the top-left cell of a complete ' + size + '×' + size + ' variant block.</span>');
     return;
   }
-  const variants = indices.map(index => tileset.defs[index].ch);
-  autotileGroups = autotileGroups.filter(group => !group.variants.some(ch => variants.includes(ch)));
-  autotileGroups.push({
-    name: (tileset.defs[base].name || 'Terrain') + ' ' + (mode === 'bitmask' ? 'bitmask' : 'terrain'),
+  registerAutotileFromIndices(
     mode,
-    variants
-  });
-  curAutoTile = autotileGroups.length - 1;
-  curStamp = null;
+    indices,
+    (tileset.defs[base].name || 'Terrain') + ' ' + (mode === 'bitmask' ? 'bitmask' : 'terrain')
+  );
   buildInspector();
   status('<span class="ok">' + (mode === 'bitmask' ? '4×4 bitmask' : '3×3 terrain') + ' brush created and activated.</span>');
+}
+function makeThreeFrameAnimationFromHere() {
+  const col = curTile % tileset.tilesPerRow;
+  const indices = [curTile, curTile + 1, curTile + 2];
+  if (col + 2 >= tileset.tilesPerRow || indices.some(index => !tileset.defs[index] || tileset.defs[index].empty)) {
+    status('<span class="err">This tile needs two non-empty frames immediately to its right.</span>');
+    return;
+  }
+  addTileAnimation(indices, (tileset.defs[curTile].name || 'Tile') + ' animation');
+  buildPalette(); buildInspector();
+  status('<span class="ok">Created a 3-frame horizontal animation.</span>');
 }
 function buildInspector() {
   const box = $('tileInspector');
@@ -528,6 +662,16 @@ function buildInspector() {
   const d = tileset.defs[curTile]; if (!d) { box.innerHTML = ''; return; }
   const groupIndex = autotileGroupForTile(curTile);
   const autoActive = groupIndex >= 0 && curAutoTile === groupIndex;
+  const selectedAnimation = tileAnimationForAnyFrame(d.ch);
+  const animationTools = selectedAnimation
+    ? '<div class="autotile-tools"><button id="iAnimRoot">' +
+      (selectedAnimation.frames[0] === d.ch ? 'Animation · ' + selectedAnimation.frames.length + ' frames' : 'Select animation root') +
+      '</button><button id="iAnimRemove">Forget animation</button><label class="field">Frame time <select id="iAnimSpeed">' +
+      [120, 180, 240, 320, 480].map(ms => '<option value="' + ms + '"' + ((selectedAnimation.frameMs || 240) === ms ? ' selected' : '') + '>' + ms + ' ms</option>').join('') +
+      '</select></label>' +
+      '<span class="autotile-hint">Map cells store the first frame and preview the animation automatically.</span></div>'
+    : '<div class="autotile-tools"><button id="iAnim3">Animate 3 tiles →</button>' +
+      '<span class="autotile-hint">Uses this tile and the next two cells as horizontal animation frames.</span></div>';
   const autoTools = groupIndex >= 0
     ? '<div class="autotile-tools"><button id="iAutoToggle" class="' + (autoActive ? 'active' : '') + '">' +
       (autoActive ? 'Auto brush: on' : 'Use auto brush') + '</button><button id="iAutoRemove">Forget auto group</button>' +
@@ -543,7 +687,7 @@ function buildInspector() {
     '<span class="chip canopy' + (d.canopy ? ' on' : '') + '">canopy</span></div>' +
     '</div></div>' +
     '<div class="palpick"><label>Palette</label><div class="palramps" id="palRamps"></div></div>' +
-    autoTools;
+    animationTools + autoTools;
   const pv = box.querySelector('.ipreview').getContext('2d'); pv.imageSmoothingEnabled = false;
   if (tilesReady) drawTile(pv, curTile, 0, 0, 46, 46);
   const iCh = box.querySelector('#iCh'), iName = box.querySelector('#iName');
@@ -571,6 +715,23 @@ function buildInspector() {
     el.onclick = () => { d.pal = pi; buildTileCache(); draw(); drawSwatches(); buildInspector(); };
     rr.appendChild(el);
   });
+  if (selectedAnimation) {
+    box.querySelector('#iAnimRoot').onclick = () => {
+      curTile = chToIdx[selectedAnimation.frames[0]] ?? curTile;
+      tilePage = pageForTile(curTile); buildPalette(); buildInspector();
+    };
+    box.querySelector('#iAnimRemove').onclick = () => {
+      tileAnimations = tileAnimations.filter(animation => animation !== selectedAnimation);
+      buildPalette(); buildInspector(); draw();
+      status('Tile animation removed. Its source frames remain available.');
+    };
+    box.querySelector('#iAnimSpeed').onchange = event => {
+      selectedAnimation.frameMs = +event.target.value || 240;
+      lastAnimationSignature = '';
+    };
+  } else {
+    box.querySelector('#iAnim3').onclick = makeThreeFrameAnimationFromHere;
+  }
   if (groupIndex >= 0) {
     box.querySelector('#iAutoToggle').onclick = () => {
       curAutoTile = curAutoTile === groupIndex ? null : groupIndex;
@@ -680,6 +841,20 @@ function autotileVariant(group, mask) {
   if (group.mode === 'bitmask') return group.variants[mask] || group.variants[0];
   const n = !!(mask & 1), e = !!(mask & 2), s = !!(mask & 4), w = !!(mask & 8);
   const v = group.variants;
+  if (group.mode === 'rpg12') {
+    if (!n && !w) return v[0];
+    if (!n && !e) return v[2];
+    if (!s && !w) return v[9];
+    if (!s && !e) return v[11];
+    if (!n) return v[1];
+    if (!w) return v[3];
+    if (!e) return v[5];
+    if (!s) return v[10];
+    if (!(mask & 16)) return v[4];   // missing north-west diagonal
+    if (!(mask & 32)) return v[8];   // missing north-east diagonal
+    if (!(mask & 128)) return v[6];  // missing south-west diagonal
+    return v[7];                     // center / south-east inner corner fallback
+  }
   if (!n && !e && !s && !w) return v[4];
   if (!n && !w) return v[0];
   if (!n && !e) return v[2];
@@ -696,13 +871,15 @@ function refreshAutotileCell(lay, x, y, group) {
   if (!group.variants.includes(lay[y][x])) return;
   const connected = (nx, ny) => nx >= 0 && ny >= 0 && nx < cols && ny < rows && group.variants.includes(lay[ny][nx]);
   const mask = (connected(x, y - 1) ? 1 : 0) | (connected(x + 1, y) ? 2 : 0) |
-    (connected(x, y + 1) ? 4 : 0) | (connected(x - 1, y) ? 8 : 0);
+    (connected(x, y + 1) ? 4 : 0) | (connected(x - 1, y) ? 8 : 0) |
+    (connected(x - 1, y - 1) ? 16 : 0) | (connected(x + 1, y - 1) ? 32 : 0) |
+    (connected(x + 1, y + 1) ? 64 : 0) | (connected(x - 1, y + 1) ? 128 : 0);
   lay[y][x] = autotileVariant(group, mask);
 }
 function refreshAutotileAround(lay, x, y, group) {
-  [[x, y], [x, y - 1], [x + 1, y], [x, y + 1], [x - 1, y]].forEach(([tx, ty]) => {
-    refreshAutotileCell(lay, tx, ty, group);
-  });
+  for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+    refreshAutotileCell(lay, x + ox, y + oy, group);
+  }
 }
 function paintCell(cell) {
   if (activeLayer === 'events') return;
@@ -720,7 +897,8 @@ function paintCell(cell) {
   const previousGroups = autotileGroups.filter(group => group.variants.includes(previous));
   if (curAutoTile != null && autotileGroups[curAutoTile]) {
     const group = autotileGroups[curAutoTile];
-    lay[cell.y][cell.x] = group.mode === 'bitmask' ? group.variants[0] : group.variants[4];
+    lay[cell.y][cell.x] = group.mode === 'bitmask' ? group.variants[0] :
+      group.mode === 'rpg12' ? group.variants[7] : group.variants[4];
     previousGroups.filter(other => other !== group).forEach(other => refreshAutotileAround(lay, cell.x, cell.y, other));
     refreshAutotileAround(lay, cell.x, cell.y, group);
     requestDraw(); return;
@@ -845,7 +1023,7 @@ function bakeComposited() {
       for (let li = 0; li < 3; li++) {
         const ch = layers[li][r][c]; if (ch == null) continue;
         const idx = chToIdx[ch]; if (idx == null) continue;
-        drawTile(cg, idx, 0, 0, SRC, SRC);
+        drawTile(cg, idx, 0, 0, SRC, SRC, false);
       }
       const data = cg.getImageData(0, 0, SRC, SRC);
       const h = tileHash(data.data);
@@ -875,6 +1053,7 @@ function buildJSON() {
     tileset: { columns: tileset.tilesPerRow, tileSize: SRC, image: tilesetDataURL() },
     baked,
     autotiles: autotileGroups.map(group => ({ name: group.name, mode: group.mode, variants: group.variants.slice() })),
+    animations: tileAnimations.map(animation => ({ ...animation, frames: animation.frames.slice() })),
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, w: o.tw * SRC, h: o.th * SRC, tilesW: o.tw, tilesH: o.th, console: o.console, image: o.imgSrc || null })),
     markers: Object.fromEntries(markerOrder.filter(n => markers[n]).map(n => [n, markers[n]]))
   };
@@ -964,7 +1143,7 @@ function loadTilesetFromImage(img, tileSize) {
     }
   }
   tileset = { img, tilesPerRow: tpr, count, defs };
-  autotileGroups = []; curAutoTile = null;
+  autotileGroups = []; curAutoTile = null; tileAnimations = []; tileSelection = [];
   const visible = analysis.filter(tile => !tile.empty).length;
   tilesReady = true; tilePage = 0; rebuildChMap(); buildTileCache(); syncSize();
   status('<span class="ok">Imported ' + visible + ' visible tiles at ' + tileSize + '×' + tileSize +
@@ -1018,6 +1197,7 @@ function saveRoom() {
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
     autotileGroups: autotileGroups.map(group => ({ ...group, variants: group.variants.slice() })),
+    tileAnimations: tileAnimations.map(animation => ({ ...animation, frames: animation.frames.slice() })),
     palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
     curPreset, invert,
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
@@ -1062,6 +1242,10 @@ function loadRoom(name, d) {
   autotileGroups = (d.autotileGroups || []).filter(group =>
     Array.isArray(group.variants) && group.variants.length && group.variants.every(ch => validChars.has(ch))
   ).map(group => ({ ...group, variants: group.variants.slice() }));
+  tileAnimations = (d.tileAnimations || []).filter(animation =>
+    Array.isArray(animation.frames) && animation.frames.length > 1 && animation.frames.every(ch => validChars.has(ch))
+  ).map(animation => ({ ...animation, frameMs: animation.frameMs || 240, frames: animation.frames.slice() }));
+  tileSelection = [];
   curAutoTile = null;
   if (d.palettes) palettes = d.palettes.map(p => ({
     name: LEGACY_PALETTE_NAMES[p.name] || p.name,
@@ -1088,6 +1272,7 @@ function buildProject() {
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
     autotileGroups: autotileGroups.map(group => ({ ...group, variants: group.variants.slice() })),
+    tileAnimations: tileAnimations.map(animation => ({ ...animation, frames: animation.frames.slice() })),
     palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
     tilesSrc: tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src && tileset.img.src.startsWith('data:') ? tileset.img.src : null),
@@ -1166,7 +1351,7 @@ function renderMapPNG(scale) {
       const ch = layers[li][r][cc]; if (ch == null) continue;
       const idx = chToIdx[ch]; if (idx == null) continue;
       const dx = cc * SRC * scale, dy = r * SRC * scale, ds = SRC * scale;
-      drawTile(g, idx, dx, dy, ds, ds);
+      drawTile(g, idx, dx, dy, ds, ds, false);
     }
   }
   objects.forEach(o => { if (o.img) g.drawImage(o.img, 0, 0, o.img.naturalWidth, o.img.naturalHeight, o.x * SRC * scale, o.y * SRC * scale, o.tw * SRC * scale, o.th * SRC * scale); });
@@ -1379,9 +1564,14 @@ $('btnCheck').onclick = checkBorder;
 $('btnExport').onclick = openExport;
 $('btnUpload').onclick = () => $('fileInput').click();
 $('btnAutoPalette').onclick = () => autoAssignPalettes(true);
+$('btnMakeAnimation').onclick = makeAnimationFromSelection;
+$('btnMakeTerrain3').onclick = () => makeTerrainFromTileSelection('nine-slice');
+$('btnMakeTerrain12').onclick = () => makeTerrainFromTileSelection('rpg12');
+$('btnMakeTerrain4').onclick = () => makeTerrainFromTileSelection('bitmask');
+$('btnClearTileSelection').onclick = () => clearTileSelection(true);
 $('tileErase').onclick = () => {
   if (activeLayer === 0) return;
-  curTile = -1; curStamp = null; curAutoTile = null; refreshPalSel(); buildInspector();
+  curTile = -1; curStamp = null; curAutoTile = null; clearTileSelection(false); refreshPalSel(); buildInspector();
 };
 $('tilePrev').onclick = () => { if (tilePage > 0) { tilePage--; buildPalette(); } };
 $('tileNext').onclick = () => {
@@ -1492,3 +1682,4 @@ newMap(20, 18);
 fillPresetDropdown();
 buildLayerList(); buildPalette(); buildMarkerList();
 setActiveLayer(0);
+requestAnimationFrame(animationLoop);

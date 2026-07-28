@@ -21,7 +21,9 @@ Double-click `index.html`, or host the three files on any static web server.
 - Three tile layers (Ground, Object 1, Object 2) and an Events layer
 - RPG Maker-style tile grid that preserves source rows and transparent gaps
 - Automatic nearest-palette matching for imported tiles
+- Multi-select frame composer with animated map and palette previews
 - Reusable 3×3 terrain and 4×4 bitmask auto-tile brushes
+- RPG-style 3×4 animated terrain composition with three horizontal frames
 - Row-aligned pagination for large tilesets
 - Resizable left sidebar; its width is remembered in the browser
 - Eight editable four-color palette slots with live console-style recoloring

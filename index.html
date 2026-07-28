@@ -53,6 +53,17 @@
         <button id="tileNext" type="button" title="Next tiles" aria-label="Next tiles">›</button>
       </span>
     </div>
+    <div id="tileSelectionBar" class="tile-selection-bar" hidden>
+      <span id="tileSelectionCount">0 selected</span>
+      <div class="selection-actions">
+        <button id="btnMakeAnimation" type="button" title="Combine selected tiles into one animation in selection order">Make animation</button>
+        <button id="btnMakeTerrain3" type="button" title="Select 9 animation roots in corner/edge/center order">3×3 terrain</button>
+        <button id="btnMakeTerrain12" type="button" title="Select 12 first frames in target 3×4 order; two frames to the right are added automatically">RPG 3×4 · 3f</button>
+        <button id="btnMakeTerrain4" type="button" title="Select 16 animation roots in mask order 0–15">4×4 bitmask</button>
+        <button id="btnClearTileSelection" type="button">Clear</button>
+      </div>
+      <span class="hint">Ctrl/Cmd-click tiles in numbered order. For RPG 3×4, select the first frame of each logical tile row-by-row in the assembled target layout.</span>
+    </div>
     <div id="swatches"></div>
     <div id="tileInspector"></div>
     <div class="tileset-import">
