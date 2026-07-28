@@ -16,6 +16,15 @@ const BUILTIN_DEFS = [
   { ch: '*', name: 'Flowers',   solid: false, canopy: false, pal: 6 },
   { ch: 'o', name: 'Rock',      solid: true,  canopy: false, pal: 3 },
 ];
+const LEGACY_TILE_NAMES = {
+  Gras: 'Grass', Erde: 'Dirt', Stein: 'Stone', Wasser: 'Water', Sand: 'Sand',
+  Weg: 'Path', Holz: 'Wood', Berg: 'Mountain', Baum: 'Tree', Busch: 'Bush',
+  Blumen: 'Flowers', Fels: 'Rock'
+};
+const LEGACY_PALETTE_NAMES = {
+  Gras: 'Grass', Wasser: 'Water', Erde: 'Dirt', Stein: 'Stone', Holz: 'Wood',
+  Laub: 'Foliage', Blüten: 'Flowers', Neutral: 'Neutral'
+};
 // 8 Paletten-Slots nach Funktion (Tile.pal zeigt auf einen Slot 0..7), je 4 Farben hell→dunkel.
 const PAL_SLOTS = ['Grass', 'Water', 'Dirt', 'Stone', 'Wood', 'Foliage', 'Flowers', 'Neutral'];
 // Beliebte Farbpaletten-Presets zum Auswählen (füllen die 8 Slots).
@@ -858,9 +867,21 @@ function loadRoom(name, d) {
   cols = d.cols; rows = d.rows;
   layers = d.layers.map(l => l.map(s => s.split('').map(ch => ch === ' ' ? null : ch)));
   if (layers.length < 3) while (layers.length < 3) layers.push(blankLayer(cols, rows, null));
-  markers = d.markers || {}; markerOrder = d.markerOrder || Object.keys(markers);
-  if (d.defs) { tileset.defs = d.defs.map(x => ({ ...x })); tileset.tilesPerRow = d.tilesPerRow || 12; }
-  if (d.palettes) palettes = d.palettes.map(p => ({ name: p.name, hex: p.hex.slice(), rgb: p.hex.map(hexToRgb) }));
+  const legacyMarkerNames = { tuer: 'door', truhe: 'chest', ziel: 'goal' };
+  markers = {};
+  Object.entries(d.markers || {}).forEach(([markerName, value]) => {
+    markers[legacyMarkerNames[markerName] || markerName] = value;
+  });
+  markerOrder = [...new Set((d.markerOrder || Object.keys(markers)).map(markerName => legacyMarkerNames[markerName] || markerName))];
+  if (d.defs) {
+    tileset.defs = d.defs.map(x => ({ ...x, name: LEGACY_TILE_NAMES[x.name] || x.name }));
+    tileset.tilesPerRow = d.tilesPerRow || 12;
+  }
+  if (d.palettes) palettes = d.palettes.map(p => ({
+    name: LEGACY_PALETTE_NAMES[p.name] || p.name,
+    hex: p.hex.slice(),
+    rgb: p.hex.map(hexToRgb)
+  }));
   if (d.curPreset != null) { curPreset = d.curPreset; $('palPreset').value = curPreset; }   // nur Anzeige — Farben kommen aus d.palettes
   if (d.invert != null) { invert = !!d.invert; $('chkInvert').checked = invert; }
   objects = (d.objects || []).map(o => ({ ...o, console: o.console === 'Frei' ? 'Free' : o.console, img: null }));
