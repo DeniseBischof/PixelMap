@@ -3,21 +3,21 @@ const BUILTIN_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAICAYAA
 
 // Standard-Legende (Reihenfolge = Bild). solid/canopy = Editor-Metadaten, pal = Palette-Index.
 const BUILTIN_DEFS = [
-  { ch: '.', name: 'Gras',     solid: false, canopy: false, pal: 0 },
-  { ch: ',', name: 'Erde',     solid: false, canopy: false, pal: 2 },
-  { ch: '#', name: 'Stein',    solid: true,  canopy: false, pal: 3 },
-  { ch: '~', name: 'Wasser',   solid: true,  canopy: false, pal: 1 },
-  { ch: '_', name: 'Sand',     solid: false, canopy: false, pal: 2 },
-  { ch: '=', name: 'Weg',      solid: false, canopy: false, pal: 2 },
-  { ch: 'w', name: 'Holz',     solid: false, canopy: false, pal: 4 },
-  { ch: '^', name: 'Berg',     solid: true,  canopy: false, pal: 3 },
-  { ch: 'T', name: 'Baum',     solid: true,  canopy: false, pal: 5 },
-  { ch: 'B', name: 'Busch',    solid: true,  canopy: false, pal: 5 },
-  { ch: '*', name: 'Blumen',   solid: false, canopy: false, pal: 6 },
-  { ch: 'o', name: 'Fels',     solid: true,  canopy: false, pal: 3 },
+  { ch: '.', name: 'Grass',     solid: false, canopy: false, pal: 0 },
+  { ch: ',', name: 'Dirt',      solid: false, canopy: false, pal: 2 },
+  { ch: '#', name: 'Stone',     solid: true,  canopy: false, pal: 3 },
+  { ch: '~', name: 'Water',     solid: true,  canopy: false, pal: 1 },
+  { ch: '_', name: 'Sand',      solid: false, canopy: false, pal: 2 },
+  { ch: '=', name: 'Path',      solid: false, canopy: false, pal: 2 },
+  { ch: 'w', name: 'Wood',      solid: false, canopy: false, pal: 4 },
+  { ch: '^', name: 'Mountain',  solid: true,  canopy: false, pal: 3 },
+  { ch: 'T', name: 'Tree',      solid: true,  canopy: false, pal: 5 },
+  { ch: 'B', name: 'Bush',      solid: true,  canopy: false, pal: 5 },
+  { ch: '*', name: 'Flowers',   solid: false, canopy: false, pal: 6 },
+  { ch: 'o', name: 'Rock',      solid: true,  canopy: false, pal: 3 },
 ];
 // 8 Paletten-Slots nach Funktion (Tile.pal zeigt auf einen Slot 0..7), je 4 Farben hell→dunkel.
-const PAL_SLOTS = ['Gras', 'Wasser', 'Erde', 'Stein', 'Holz', 'Laub', 'Blüten', 'Neutral'];
+const PAL_SLOTS = ['Grass', 'Water', 'Dirt', 'Stone', 'Wood', 'Foliage', 'Flowers', 'Neutral'];
 // Beliebte Farbpaletten-Presets zum Auswählen (füllen die 8 Slots).
 const PALETTE_PRESETS = [
   { name: 'Warm Cartridge', pals: [
@@ -30,7 +30,7 @@ const PALETTE_PRESETS = [
     ['#e4cfa0','#c39a5e','#8a5f30','#432c15'], ['#dcdcd4','#a7a79c','#6e6e63','#2c2c25'],
     ['#d9b183','#a9743c','#6f4520','#2f1d0e'], ['#a7cf7a','#5a9440','#356b28','#173a15'],
     ['#f3d6df','#e78fa6','#c14f6c','#6f2438'], ['#eeeee6','#b3b3a6','#6d6d60','#26261d'] ] },
-  { name: 'Pastell (Sweetie-16)', pals: [
+  { name: 'Pastel (Sweetie-16)', pals: [
     ['#a7f070','#38b764','#257179','#1a1c2c'], ['#73eff7','#41a6f6','#3b5dc9','#29366f'],
     ['#ffcd75','#ef7d57','#b13e53','#5d275d'], ['#f4f4f4','#94b0c2','#566c86','#333c57'],
     ['#ffcd75','#c98a4b','#8a5a2c','#3a2416'], ['#a7f070','#38b764','#1e6b3a','#123a1e'],
@@ -50,7 +50,7 @@ const PALETTE_PRESETS = [
   { name: 'Hollow',           pals: monoVaried(['#fafbf6','#c6b7be','#565a75','#0f0f1b']) },
   { name: '2-Bit Demichrome', pals: monoVaried(['#e9efec','#a0a08b','#555568','#211e20']) },
   { name: 'CGA',              pals: monoVaried(['#ffffff','#55ffff','#ff55ff','#000000']) },
-  { name: 'Graustufen',       pals: monoVaried(['#e8e8e8','#a0a0a0','#585858','#181818']) },
+  { name: 'Grayscale',        pals: monoVaried(['#e8e8e8','#a0a0a0','#585858','#181818']) },
 ];
 // Mono-Palette (1 Rampe) → 8 variierte Slots: Wasser/Stein/Laub bekommen die umgekehrte
 // Stufen-Reihenfolge (dunkle Basis), damit sich Tiles unterscheiden statt alle gleich zu sein.
@@ -72,11 +72,13 @@ function setTileSize(px) {
   SRC = px;
   CELL = px <= 8 ? 24 : px <= 16 ? 32 : 48;
   srcCanvas = null;               // Offscreen-Puffer passt nicht mehr
+  const sizeSelect = document.getElementById('tilesetSize');
+  if (sizeSelect && ['8', '16', '32'].includes(String(px))) sizeSelect.value = String(px);
 }
 const LS_KEY = 'pixelmap_rooms_v1', LS_KEY_OLD = 'smalldurs_rooms_v2';   // alter Schlüssel wird einmalig migriert
-const LAYER_NAMES = ['Boden', 'Objekt 1', 'Objekt 2'];
-const DEFAULT_MARKERS = ['start', 'tuer', 'npc', 'truhe', 'ziel'];
-const MARKER_COLORS = { start:'#6cc46c', tuer:'#c4a24a', npc:'#6c9ac4', truhe:'#c46c9a', ziel:'#c46c6c' };
+const LAYER_NAMES = ['Ground', 'Object 1', 'Object 2'];
+const DEFAULT_MARKERS = ['start', 'door', 'npc', 'chest', 'goal'];
+const MARKER_COLORS = { start:'#6cc46c', door:'#c4a24a', npc:'#6c9ac4', chest:'#c46c9a', goal:'#c46c6c' };
 // Sprite-Größen, sortiert nach Konsole (px). Tile-Footprint = w/8 × h/8.
 const SPRITE_SIZES = [
   { console: 'Game Boy',   list: [[8,8],[8,16],[16,16],[16,24],[24,24],[32,32],[32,48]] },
@@ -110,7 +112,11 @@ let chToIdx = {};
 // Paletten (rgb aus hex abgeleitet) + Tile-Cache der eingefärbten 8×8-Kacheln
 let palettes = presetPalettes(0);
 let tileCache = [];            // tileCache[i] = 8×8-Canvas (eingefärbt) | null
-let srcCanvas = null;          // Offscreen mit dem gesamten Tileset (für Pixel-Lesen)
+let srcCanvas = null;          // Kept for backward-compatible project state resets.
+const TILE_PAGE_SIZE = 192;
+const MAX_TILE_COUNT = 6400;
+let tilePage = 0;
+let drawPending = false;
 
 const $ = id => document.getElementById(id);
 const cv = $('grid'), ctx = cv.getContext('2d');
@@ -118,6 +124,11 @@ const cv = $('grid'), ctx = cv.getContext('2d');
 function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function rebuildChMap() { chToIdx = {}; tileset.defs.forEach((d, i) => { if (d.ch) chToIdx[d.ch] = i; }); }
 function srcXY(idx) { return [(idx % tileset.tilesPerRow) * SRC, Math.floor(idx / tileset.tilesPerRow) * SRC]; }
+function tileCharForIndex(i) {
+  if (i < CHAR_POOL.length) return CHAR_POOL[i];
+  const privateUse = i - CHAR_POOL.length;
+  return privateUse < 6400 ? String.fromCharCode(0xE000 + privateUse) : null;
+}
 
 // ---- Tile-Atlas (wächst, nimmt Tiles aus Blättern auf) + Dubletten-Erkennung ----
 let tileHashes = {};
@@ -143,7 +154,14 @@ function rebuildTileHashes() {
   const g = tileset.img.getContext('2d');
   for (let i = 0; i < tileset.defs.length; i++) { const [sx, sy] = srcXY(i); try { tileHashes[tileHash(g.getImageData(sx, sy, SRC, SRC).data)] = i; } catch (_) {} }
 }
-function nextChar() { const used = new Set(tileset.defs.map(d => d.ch)); for (const c of CHAR_POOL) if (!used.has(c)) return c; return '?'; }
+function nextChar() {
+  const used = new Set(tileset.defs.map(d => d.ch));
+  for (let i = 0; i < MAX_TILE_COUNT; i++) {
+    const ch = tileCharForIndex(i);
+    if (ch && !used.has(ch)) return ch;
+  }
+  return null;
+}
 function colorClose(r, g, b, rgb, tol) { tol = tol || 24; return Math.abs(r - rgb[0]) <= tol && Math.abs(g - rgb[1]) <= tol && Math.abs(b - rgb[2]) <= tol; }
 // ordnet einen Durchschnitts-RGB einem Paletten-Slot zu (Gras/Wasser/Erde/Stein/Holz/Laub/Blüten/Neutral)
 function classifyPalette(r, g, b) {
@@ -177,7 +195,9 @@ function addTileFromRegion(data, srcW, sx, sy, transpRgb) {
   const [dx, dy] = srcXY(idx);
   tileset.img.getContext('2d').putImageData(new ImageData(tmp, SRC, SRC), dx, dy);
   const pal = classifyPalette(sr / sn, sg / sn, sb / sn);   // passende Palette nach Farbton
-  tileset.defs.push({ ch: nextChar(), name: 'Tile ' + idx, solid: false, canopy: false, pal });
+  const ch = nextChar();
+  if (!ch) return null;
+  tileset.defs.push({ ch, name: 'Tile ' + idx, solid: false, canopy: false, pal });
   tileHashes[h] = idx; rebuildChMap();
   return idx;
 }
@@ -185,35 +205,43 @@ function addTileFromRegion(data, srcW, sx, sy, transpRgb) {
 // ---- Recolor: Quellpixel → 4 Helligkeitsstufen → Palette-Farbe ----
 function buildTileCache() {
   tileCache = [];
-  if (!tilesReady) return;
-  const w = tileset.img.naturalWidth || tileset.img.width, h = tileset.img.naturalHeight || tileset.img.height;
-  if (!srcCanvas || srcCanvas.width !== w || srcCanvas.height !== h) {
-    srcCanvas = document.createElement('canvas'); srcCanvas.width = w; srcCanvas.height = h;
-  }
-  const sg = srcCanvas.getContext('2d'); sg.imageSmoothingEnabled = false;
-  sg.clearRect(0, 0, w, h); sg.drawImage(tileset.img, 0, 0);
-  let data; try { data = sg.getImageData(0, 0, w, h).data; } catch (e) { recolor = false; return; }
-  tileset.defs.forEach((d, i) => {
-    const [sx, sy] = srcXY(i);
-    const c = document.createElement('canvas'); c.width = SRC; c.height = SRC;
-    const g = c.getContext('2d'); const out = g.createImageData(SRC, SRC);
+}
+function getRecoloredTile(i) {
+  if (tileCache[i]) return tileCache[i];
+  const d = tileset.defs[i];
+  if (!tilesReady || !d) return null;
+  const [sx, sy] = srcXY(i);
+  const c = document.createElement('canvas'); c.width = SRC; c.height = SRC;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  try {
+    g.drawImage(tileset.img, sx, sy, SRC, SRC, 0, 0, SRC, SRC);
+    const out = g.getImageData(0, 0, SRC, SRC);
     const pal = (palettes[d.pal] || palettes[0]).rgb;
-    for (let y = 0; y < SRC; y++) for (let x = 0; x < SRC; x++) {
-      const si = ((sy + y) * w + (sx + x)) * 4, oi = (y * SRC + x) * 4;
-      const a = data[si + 3];
+    for (let oi = 0; oi < out.data.length; oi += 4) {
+      const a = out.data[oi + 3];
       if (a < 128) { out.data[oi + 3] = 0; continue; }
-      const lum = 0.299 * data[si] + 0.587 * data[si + 1] + 0.114 * data[si + 2];
-      let q = lum >= 192 ? 0 : lum >= 128 ? 1 : lum >= 64 ? 2 : 3;   // hell→dunkel = Index 0→3
-      if (invert) q = 3 - q;                                          // Stufen tauschen
+      const lum = 0.299 * out.data[oi] + 0.587 * out.data[oi + 1] + 0.114 * out.data[oi + 2];
+      let q = lum >= 192 ? 0 : lum >= 128 ? 1 : lum >= 64 ? 2 : 3;
+      if (invert) q = 3 - q;
       out.data[oi] = pal[q][0]; out.data[oi + 1] = pal[q][1]; out.data[oi + 2] = pal[q][2]; out.data[oi + 3] = 255;
     }
-    g.putImageData(out, 0, 0); tileCache[i] = c;
-  });
+    g.putImageData(out, 0, 0);
+    tileCache[i] = c;
+    return c;
+  } catch (_) {
+    return null;
+  }
 }
 // zeichnet Tile idx in ein Ziel-Rechteck (recolored oder roh)
 function drawTile(g, idx, dx, dy, dw, dh) {
-  if (recolor && tileCache[idx]) g.drawImage(tileCache[idx], 0, 0, SRC, SRC, dx, dy, dw, dh);
+  const cached = recolor ? getRecoloredTile(idx) : null;
+  if (cached) g.drawImage(cached, 0, 0, SRC, SRC, dx, dy, dw, dh);
   else { const [sx, sy] = srcXY(idx); g.drawImage(tileset.img, sx, sy, SRC, SRC, dx, dy, dw, dh); }
+}
+function requestDraw() {
+  if (drawPending) return;
+  drawPending = true;
+  requestAnimationFrame(() => { drawPending = false; draw(); });
 }
 
 // ================= Map lifecycle =================
@@ -299,7 +327,7 @@ function buildLayerList() {
   LAYER_NAMES.forEach((nm, i) => {
     const el = document.createElement('div');
     el.className = 'layer-row' + (activeLayer === i ? ' sel' : '');
-    const badge = i === 0 ? 'Boden' : i === 1 ? 'solide Props' : 'canopy';
+    const badge = i === 0 ? 'base' : i === 1 ? 'solid props' : 'canopy';
     el.innerHTML = '<span class="eye' + (layerVis[i] ? '' : ' off') + '">' + (layerVis[i] ? '●' : '○') +
       '</span><span class="lname">' + nm + '</span><span class="badge">' + badge + '</span>';
     el.querySelector('.eye').onclick = e => { e.stopPropagation(); layerVis[i] = !layerVis[i]; buildLayerList(); draw(); };
@@ -318,31 +346,47 @@ function setActiveLayer(l) {
   $('eventPanel').style.display = l === 'events' ? 'block' : 'none';
   $('paletteTitle').style.display = l === 'events' ? 'none' : 'block';
   $('tileInspector').style.display = l === 'events' ? 'none' : 'block';
-  $('swatches').style.display = l === 'events' ? 'none' : 'block';
+  $('swatches').style.display = l === 'events' ? 'none' : 'grid';
+  $('tilePager').style.display = l === 'events' ? 'none' : 'flex';
   $('btnUpload').style.display = l === 'events' ? 'none' : 'block';
   buildLayerList(); buildPalette(); buildMarkerList(); buildObjectList(); buildObjInspector(); draw();
 }
 
 // ================= Palette UI (Raster + Inspektor) =================
+function updateTilePager() {
+  const pages = Math.max(1, Math.ceil(tileset.defs.length / TILE_PAGE_SIZE));
+  tilePage = Math.max(0, Math.min(pages - 1, tilePage));
+  const start = tileset.defs.length ? tilePage * TILE_PAGE_SIZE + 1 : 0;
+  const end = Math.min(tileset.defs.length, (tilePage + 1) * TILE_PAGE_SIZE);
+  $('tileRange').textContent = tileset.defs.length > TILE_PAGE_SIZE
+    ? start + '–' + end + ' of ' + tileset.defs.length + ' tiles'
+    : tileset.defs.length + (tileset.defs.length === 1 ? ' tile' : ' tiles');
+  $('tilePrev').disabled = tilePage <= 0;
+  $('tileNext').disabled = tilePage >= pages - 1;
+}
 function buildPalette() {
   const box = $('swatches'); box.innerHTML = '';
   if (activeLayer === 'events') { buildInspector(); return; }
+  updateTilePager();
   // Radierer nur auf Objekt-Ebenen sinnvoll (Boden hat immer ein Tile)
   if (activeLayer !== 0) {
     const er = document.createElement('canvas');
     er.className = 'swatch eraser' + (curTile === -1 ? ' sel' : '');
-    er.width = 34; er.height = 34; er.title = 'Radierer (leer)';
+    er.width = 34; er.height = 34; er.title = 'Eraser (empty)';
     er.onclick = () => { curTile = -1; curStamp = null; refreshPalSel(); buildInspector(); };
     box.appendChild(er);
   }
-  tileset.defs.forEach((d, i) => {
+  const start = tilePage * TILE_PAGE_SIZE;
+  const end = Math.min(tileset.defs.length, start + TILE_PAGE_SIZE);
+  for (let i = start; i < end; i++) {
+    const d = tileset.defs[i];
     const sc = document.createElement('canvas');
     sc.className = 'swatch' + (curTile === i ? ' sel' : '');
     sc.width = 34; sc.height = 34; sc.dataset.i = i;
     sc.title = (d.ch || '?') + ' · ' + d.name;
     sc.onclick = () => { curTile = i; curStamp = null; refreshPalSel(); buildInspector(); };
     box.appendChild(sc);
-  });
+  }
   drawSwatches();
   buildInspector();
 }
@@ -363,14 +407,14 @@ function refreshPalSel() {
 function buildInspector() {
   const box = $('tileInspector');
   if (activeLayer === 'events') { box.innerHTML = ''; return; }
-  if (curTile === -1) { box.innerHTML = '<div class="insp"><b>Radierer</b>&nbsp;<span class="hint">löscht Tiles auf dieser Ebene</span></div>'; return; }
+  if (curTile === -1) { box.innerHTML = '<div class="insp"><b>Eraser</b>&nbsp;<span class="hint">clears tiles on this layer</span></div>'; return; }
   const d = tileset.defs[curTile]; if (!d) { box.innerHTML = ''; return; }
   box.innerHTML =
     '<div class="insp"><canvas class="ipreview" width="46" height="46"></canvas>' +
     '<div class="ifields">' +
-    '<div class="irow"><label>Zeichen</label><input id="iCh" maxlength="1"></div>' +
+    '<div class="irow"><label>Symbol</label><input id="iCh" maxlength="1"></div>' +
     '<div class="irow"><label>Name</label><input id="iName"></div>' +
-    '<div class="flags"><span class="chip solid' + (d.solid ? ' on' : '') + '">solide</span>' +
+    '<div class="flags"><span class="chip solid' + (d.solid ? ' on' : '') + '">solid</span>' +
     '<span class="chip canopy' + (d.canopy ? ' on' : '') + '">canopy</span></div>' +
     '</div></div>' +
     '<div class="palpick"><label>Palette</label><div class="palramps" id="palRamps"></div></div>';
@@ -378,7 +422,16 @@ function buildInspector() {
   if (tilesReady) drawTile(pv, curTile, 0, 0, 46, 46);
   const iCh = box.querySelector('#iCh'), iName = box.querySelector('#iName');
   iCh.value = d.ch || ''; iName.value = d.name;
-  iCh.onchange = () => { d.ch = iCh.value.slice(0, 1); rebuildChMap(); refreshTitles(); draw(); };
+  iCh.onchange = () => {
+    const next = iCh.value.slice(0, 1);
+    const duplicate = tileset.defs.some((other, i) => i !== curTile && other.ch === next);
+    if (!next || duplicate || /[\r\n"\\]/.test(next)) {
+      iCh.value = d.ch || '';
+      status('<span class="err">Tile symbols must be unique and cannot be quotes, slashes, or line breaks.</span>');
+      return;
+    }
+    d.ch = next; rebuildChMap(); refreshTitles(); draw();
+  };
   iName.onchange = () => { d.name = iName.value.trim(); refreshTitles(); };
   box.querySelector('.chip.solid').onclick = e => { d.solid = !d.solid; e.target.classList.toggle('on'); };
   box.querySelector('.chip.canopy').onclick = e => { d.canopy = !d.canopy; e.target.classList.toggle('on'); };
@@ -418,7 +471,7 @@ function buildMarkerList() {
 // ================= Objekte / Sprites UI =================
 function buildObjectList() {
   const box = $('objectList'); if (!box) return; box.innerHTML = '';
-  if (!objects.length) { box.innerHTML = '<div class="hint">Noch keine Objekte. Grafik laden ↓</div>'; return; }
+  if (!objects.length) { box.innerHTML = '<div class="hint">No objects yet. Import a graphic below.</div>'; return; }
   objects.forEach((o, oi) => {
     const el = document.createElement('div');
     el.className = 'marker-row' + (curObject === oi ? ' sel' : '');
@@ -429,12 +482,12 @@ function buildObjectList() {
   });
 }
 function sizeSelectHTML(o) {
-  let opts = '<option value="free"' + (o.console === 'Frei' ? ' selected' : '') + '>Frei (Bildgröße)</option>';
+  let opts = '<option value="free"' + (o.console === 'Free' ? ' selected' : '') + '>Free (image size)</option>';
   SPRITE_SIZES.forEach(grp => {
     opts += '<optgroup label="' + grp.console + '">';
     grp.list.forEach(([w, h]) => {
-      const sel = (o.console === grp.console && o.tw === w / 8 && o.th === h / 8) ? ' selected' : '';
-      opts += '<option value="' + grp.console + '|' + w + '|' + h + '"' + sel + '>' + w + '×' + h + ' (' + (w / 8) + '×' + (h / 8) + 't)</option>';
+      const sel = (o.console === grp.console && o.tw === w / SRC && o.th === h / SRC) ? ' selected' : '';
+      opts += '<option value="' + grp.console + '|' + w + '|' + h + '"' + sel + '>' + w + '×' + h + ' (' + (w / SRC) + '×' + (h / SRC) + ' tiles)</option>';
     });
     opts += '</optgroup>';
   });
@@ -447,16 +500,16 @@ function buildObjInspector() {
   box.innerHTML =
     '<div class="insp" style="flex-direction:column;align-items:stretch">' +
     '<div class="irow"><label>Name</label><input id="objName"></div>' +
-    '<div class="irow"><label>Größe</label>' + sizeSelectHTML(o) + '</div>' +
-    '<div class="irow"><label>Position</label><span class="hint">' + o.x + ',' + o.y + ' — ' + (o.tw * 8) + '×' + (o.th * 8) + 'px' + '</span></div>' +
+    '<div class="irow"><label>Size</label>' + sizeSelectHTML(o) + '</div>' +
+    '<div class="irow"><label>Position</label><span class="hint">' + o.x + ',' + o.y + ' — ' + (o.tw * SRC) + '×' + (o.th * SRC) + 'px' + '</span></div>' +
     '<div style="display:flex;gap:6px;margin-top:6px">' +
-    '<button id="objSave">PNG speichern</button><button id="objDel">Entfernen</button></div>' +
+    '<button id="objSave">Save PNG</button><button id="objDel">Remove</button></div>' +
     '</div>';
   const nm = box.querySelector('#objName'); nm.value = o.name;
   nm.onchange = () => { o.name = nm.value.trim() || o.name; buildObjectList(); draw(); };
   box.querySelector('#objSize').onchange = e => {
     const v = e.target.value;
-    if (v === 'free') { o.console = 'Frei'; if (o.img) { o.tw = Math.max(1, Math.ceil(o.img.naturalWidth / SRC)); o.th = Math.max(1, Math.ceil(o.img.naturalHeight / SRC)); } }
+    if (v === 'free') { o.console = 'Free'; if (o.img) { o.tw = Math.max(1, Math.ceil(o.img.naturalWidth / SRC)); o.th = Math.max(1, Math.ceil(o.img.naturalHeight / SRC)); } }
     else { const [cons, w, h] = v.split('|'); o.console = cons; o.tw = w / SRC; o.th = h / SRC; }
     draw(); buildObjectList(); buildObjInspector();
   };
@@ -477,7 +530,7 @@ function pushUndo() {
   if (undoStack.length > 60) undoStack.shift();
 }
 function undo() {
-  const s = undoStack.pop(); if (!s) { status('Nichts rückgängig zu machen.'); return; }
+  const s = undoStack.pop(); if (!s) { status('Nothing to undo.'); return; }
   layers = s.layers; markers = s.markers; markerOrder = s.markerOrder; objects = s.objects; cols = s.cols; rows = s.rows;
   if (curObject != null && curObject >= objects.length) curObject = null;
   syncSize(); buildMarkerList(); buildObjectList(); buildObjInspector();
@@ -493,15 +546,15 @@ function paintCell(cell) {
       const ty = cell.y + dy, tx = cell.x + dx;
       if (ty >= 0 && tx >= 0 && ty < rows && tx < cols) lay[ty][tx] = ch;
     }
-    draw(); return;
+    requestDraw(); return;
   }
   if (curTile < 0 || !tileset.defs[curTile]) { if (curTile !== -1) return; }
   const val = curTile === -1 ? (activeLayer === 0 ? '.' : null) : tileset.defs[curTile].ch;
   if (lay[cell.y][cell.x] === val) return;
-  lay[cell.y][cell.x] = val; draw();
+  lay[cell.y][cell.x] = val; requestDraw();
 }
 function placeMarker(cell) {
-  if (!curMarker) { status('Erst einen Marker links wählen.'); return; }
+  if (!curMarker) { status('Select a marker in the sidebar first.'); return; }
   pushUndo();
   const cur = markers[curMarker];
   if (cur && cur.x === cell.x && cur.y === cell.y) delete markers[curMarker];
@@ -515,7 +568,10 @@ cv.addEventListener('mousedown', e => {
   if (e.button === 2) {                     // Pipette (nur Tile-Ebenen)
     if (activeLayer !== 'events') {
       const ch = layers[activeLayer][cell.y][cell.x];
-      if (ch != null && chToIdx[ch] != null) { curTile = chToIdx[ch]; curStamp = null; refreshPalSel(); buildInspector(); status('Pipette: ' + ch); }
+      if (ch != null && chToIdx[ch] != null) {
+        curTile = chToIdx[ch]; tilePage = Math.floor(curTile / TILE_PAGE_SIZE); curStamp = null;
+        buildPalette(); status('Eyedropper: ' + (tileset.defs[curTile].name || ch));
+      }
     }
     return;
   }
@@ -554,13 +610,13 @@ function markerComments() {
 }
 function objectComments() {
   return objects.map(o => '// obj ' + o.name + ' ' + o.x + ',' + o.y + ' ' + o.tw + 'x' + o.th + 't (' +
-    (o.console && o.console !== 'Frei' ? o.console + ' ' : '') + (o.tw * 8) + 'x' + (o.th * 8) + 'px, sprite:' + o.name + '.png)');
+    (o.console && o.console !== 'Free' ? o.console + ' ' : '') + (o.tw * SRC) + 'x' + (o.th * SRC) + 'px, sprite:' + o.name + '.png)');
 }
 function legendComments() {
   const used = new Set(flatten().join('').split(''));
   const usedDefs = tileset.defs.filter(d => used.has(d.ch));
   const lines = usedDefs.map(d =>
-    '// tile ' + d.ch + ' = ' + d.name + (d.solid ? ' [solide]' : ' [begehbar]') + (d.canopy ? ' [canopy]' : '') +
+    '// tile ' + d.ch + ' = ' + d.name + (d.solid ? ' [solid]' : ' [walkable]') + (d.canopy ? ' [canopy]' : '') +
     ' pal=' + (d.pal ?? 0) + '(' + (palettes[d.pal] || palettes[0]).name + ')');
   const usedPals = [...new Set(usedDefs.map(d => d.pal ?? 0))].sort((a, b) => a - b);
   usedPals.forEach(pi => {
@@ -590,7 +646,7 @@ function mapToCArray() {
   return out;
 }
 function openExport() {
-  $('exportTitle').textContent = 'Export — ' + sanitizeName($('roomName').value) + ' (' + cols + '×' + rows + ', geflacht)';
+  $('exportTitle').textContent = 'Export — ' + sanitizeName($('roomName').value) + ' (' + cols + '×' + rows + ', flattened)';
   $('exportText').value = mapToText();
   $('exportDlg').showModal();
 }
@@ -609,8 +665,7 @@ function bakeComposited() {
       for (let li = 0; li < 3; li++) {
         const ch = layers[li][r][c]; if (ch == null) continue;
         const idx = chToIdx[ch]; if (idx == null) continue;
-        if (recolor && tileCache[idx]) cg.drawImage(tileCache[idx], 0, 0);
-        else { const [sx, sy] = srcXY(idx); cg.drawImage(tileset.img, sx, sy, SRC, SRC, 0, 0, SRC, SRC); }
+        drawTile(cg, idx, 0, 0, SRC, SRC);
       }
       const data = cg.getImageData(0, 0, SRC, SRC);
       const h = tileHash(data.data);
@@ -646,10 +701,10 @@ function buildJSON() {
 function jsonString() { return JSON.stringify(buildJSON(), null, 2); }
 function exportJSON(doCopy) {
   const j = buildJSON(); const s = JSON.stringify(j, null, 2);
-  $('exportText').value = s.length > 40000 ? s.slice(0, 40000) + '\n… (' + (s.length - 40000) + ' Zeichen mehr; Datei enthält alles)' : s;
-  const warn = (SRC === 8 && j.baked.count > 192) ? ' <span class="warn">⚠ ' + j.baked.count + ' gebackene Tiles > 192 (GB-Budget)</span>' : '';
-  status('<span class="ok">JSON: ' + j.baked.count + ' gebackene Tiles, ' + j.objects.length + ' Objekte.</span>' + warn);
-  if (doCopy) copy(s, 'JSON kopiert.');
+  $('exportText').value = s.length > 40000 ? s.slice(0, 40000) + '\n… (' + (s.length - 40000) + ' more characters; the downloaded file includes everything)' : s;
+  const warn = (SRC === 8 && j.baked.count > 192) ? ' <span class="warn">⚠ ' + j.baked.count + ' baked tiles exceed the 192-tile GB budget</span>' : '';
+  status('<span class="ok">JSON: ' + j.baked.count + ' baked tiles, ' + j.objects.length + ' objects.</span>' + warn);
+  if (doCopy) copy(s, 'JSON copied.');
   else download(sanitizeName($('roomName').value).toLowerCase() + '.json', s);
 }
 // Engine-Rohdaten: gebackenes Tileset als PNG + Karte als CSV (Tile-Indizes) —
@@ -659,7 +714,7 @@ function exportAssets() {
   const nm = sanitizeName($('roomName').value).toLowerCase();
   download(nm + '_tiles.png', null, baked.image);
   download(nm + '_map.csv', baked.map.map(r => r.join(',')).join('\n'));
-  status('<span class="ok">' + nm + '_tiles.png (' + baked.count + ' Tiles à ' + SRC + 'px, ' + baked.columns + '/Zeile) + ' + nm + '_map.csv gespeichert.</span>');
+  status('<span class="ok">Saved ' + nm + '_tiles.png (' + baked.count + ' tiles at ' + SRC + 'px, ' + baked.columns + ' per row) and ' + nm + '_map.csv.</span>');
 }
 function download(fn, text, href) {
   const a = document.createElement('a');
@@ -684,31 +739,57 @@ function checkBorder() {
   if (bad.length) {
     ctx.strokeStyle = '#e06666'; ctx.lineWidth = 3;
     bad.forEach(([x, y]) => ctx.strokeRect(x * CELL + 1.5, y * CELL + 1.5, CELL - 3, CELL - 3));
-    status('<span class="err">Rand offen: ' + bad.length + ' Zelle(n) nicht solide/Tür.</span> Rot markiert.');
-  } else status('<span class="ok">✓ Rand geschlossen.</span>');
+    status('<span class="err">Open border: ' + bad.length + ' cell(s) are not solid/doors.</span> Marked in red.');
+  } else status('<span class="ok">✓ Border is closed.</span>');
 }
 
 // ================= Tileset-Upload =================
-function loadTilesetFromImage(img) {
-  const tpr = Math.max(1, Math.floor(img.naturalWidth / SRC));
-  const tRows = Math.max(1, Math.floor(img.naturalHeight / SRC));
+function loadTilesetFromImage(img, tileSize) {
+  if (img.naturalWidth % tileSize || img.naturalHeight % tileSize) {
+    status('<span class="err">This image is ' + img.naturalWidth + '×' + img.naturalHeight +
+      'px and cannot be sliced into exact ' + tileSize + '×' + tileSize + ' tiles.</span>');
+    return;
+  }
+  const tpr = Math.max(1, Math.floor(img.naturalWidth / tileSize));
+  const tRows = Math.max(1, Math.floor(img.naturalHeight / tileSize));
   const count = tpr * tRows;
+  if (count > MAX_TILE_COUNT) {
+    status('<span class="err">This tileset contains ' + count + ' tiles. PixelMap currently supports up to ' + MAX_TILE_COUNT + ' tiles per project.</span>');
+    return;
+  }
+  setTileSize(tileSize);
   const defs = [];
+  const usedChars = new Set();
+  let charCursor = 0;
+  const allocateChar = () => {
+    while (charCursor < MAX_TILE_COUNT) {
+      const ch = tileCharForIndex(charCursor++);
+      if (ch && !usedChars.has(ch)) { usedChars.add(ch); return ch; }
+    }
+    return null;
+  };
   for (let i = 0; i < count; i++) {
     const old = tileset.defs[i];
-    defs.push(old ? { ...old } : { ch: CHAR_POOL[i] || '?', name: 'Tile ' + i, solid: false, canopy: false, pal: 7 });
+    if (old && old.ch && !usedChars.has(old.ch)) {
+      usedChars.add(old.ch);
+      defs.push({ ...old });
+    } else {
+      defs.push({ ch: allocateChar(), name: 'Tile ' + i, solid: false, canopy: false, pal: 7 });
+    }
   }
   tileset = { img, tilesPerRow: tpr, count, defs };
-  rebuildChMap(); buildTileCache();
-  status('Tileset geladen: ' + count + ' Tiles (' + tpr + '×' + tRows + '). Zeichen/Palette rechts anpassen.');
-  buildPalette(); draw();
+  tilesReady = true; tilePage = 0; rebuildChMap(); buildTileCache(); syncSize();
+  status('<span class="ok">Imported ' + count + ' tiles at ' + tileSize + '×' + tileSize + 'px (' + tpr + ' columns × ' + tRows + ' rows).</span>');
+  buildPalette();
 }
 $('fileInput').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
+  const tileSize = +$('tilesetSize').value || SRC;
   const img = new Image();
-  img.onload = () => loadTilesetFromImage(img);
-  img.onerror = () => status('<span class="err">Bild konnte nicht geladen werden.</span>');
-  img.src = URL.createObjectURL(f);
+  const objectUrl = URL.createObjectURL(f);
+  img.onload = () => { loadTilesetFromImage(img, tileSize); URL.revokeObjectURL(objectUrl); };
+  img.onerror = () => { URL.revokeObjectURL(objectUrl); status('<span class="err">The image could not be loaded.</span>'); };
+  img.src = objectUrl;
   e.target.value = '';
 };
 $('objFile').onchange = e => {
@@ -719,12 +800,12 @@ $('objFile').onchange = e => {
     let imgSrc = null;
     try { const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); imgSrc = c.toDataURL('image/png'); } catch (_) {}
     pushUndo();
-    objects.push({ name: 'obj' + (objects.length + 1), x: 1, y: 1, tw, th, console: 'Frei', img, imgSrc });
+    objects.push({ name: 'obj' + (objects.length + 1), x: 1, y: 1, tw, th, console: 'Free', img, imgSrc });
     curObject = objects.length - 1; curMarker = null;
     buildObjectList(); buildObjInspector(); buildMarkerList(); draw();
-    status('Objekt geladen: ' + img.naturalWidth + '×' + img.naturalHeight + 'px (' + tw + '×' + th + ' Tiles). Auf die Karte klicken zum Platzieren.');
+    status('Imported object: ' + img.naturalWidth + '×' + img.naturalHeight + 'px (' + tw + '×' + th + ' tiles). Click the map to place it.');
   };
-  img.onerror = () => status('<span class="err">Objekt-Bild konnte nicht geladen werden.</span>');
+  img.onerror = () => status('<span class="err">The object image could not be loaded.</span>');
   img.src = URL.createObjectURL(f);
   e.target.value = '';
 };
@@ -740,7 +821,7 @@ function loadStore() {
 }
 function saveStore(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 function saveRoom() {
-  const name = prompt('Raum speichern als:', sanitizeName($('roomName').value)); if (!name) return;
+  const name = prompt('Save room as:', sanitizeName($('roomName').value)); if (!name) return;
   const store = loadStore();
   store[name] = {
     cols, rows, tileSize: SRC,
@@ -753,21 +834,21 @@ function saveRoom() {
     tilesSrc: tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src && tileset.img.src.startsWith('data:') ? tileset.img.src : null),
     ts: Date.now()
   };
-  saveStore(store); status('<span class="ok">Gespeichert: ' + name + '</span>');
+  saveStore(store); status('<span class="ok">Saved: ' + name + '</span>');
 }
 function openLoad() {
   const store = loadStore(); const names = Object.keys(store).sort(); const box = $('loadList'); box.innerHTML = '';
-  if (!names.length) box.innerHTML = '<div class="hint">Noch keine gespeicherten Räume in diesem Browser.</div>';
+  if (!names.length) box.innerHTML = '<div class="hint">No rooms have been saved in this browser yet.</div>';
   names.forEach(name => {
     const d = store[name];
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line)';
     row.innerHTML = '<b style="font-family:ui-monospace,monospace">' + name + '</b><span class="hint">' + d.cols + '×' + d.rows + '</span><span class="hint">' + new Date(d.ts || 0).toLocaleString() + '</span>';
     const sp = document.createElement('span'); sp.style.flex = '1'; row.appendChild(sp);
-    const bL = document.createElement('button'); bL.textContent = 'Laden'; bL.className = 'primary';
+    const bL = document.createElement('button'); bL.textContent = 'Load'; bL.className = 'primary';
     bL.onclick = () => { loadRoom(name, d); $('loadDlg').close(); };
-    const bD = document.createElement('button'); bD.textContent = 'Löschen';
-    bD.onclick = () => { if (confirm('„' + name + '“ löschen?')) { const s = loadStore(); delete s[name]; saveStore(s); openLoad(); } };
+    const bD = document.createElement('button'); bD.textContent = 'Delete';
+    bD.onclick = () => { if (confirm('Delete “' + name + '”?')) { const s = loadStore(); delete s[name]; saveStore(s); openLoad(); } };
     row.appendChild(bL); row.appendChild(bD); box.appendChild(row);
   });
   $('loadDlg').showModal();
@@ -782,10 +863,10 @@ function loadRoom(name, d) {
   if (d.palettes) palettes = d.palettes.map(p => ({ name: p.name, hex: p.hex.slice(), rgb: p.hex.map(hexToRgb) }));
   if (d.curPreset != null) { curPreset = d.curPreset; $('palPreset').value = curPreset; }   // nur Anzeige — Farben kommen aus d.palettes
   if (d.invert != null) { invert = !!d.invert; $('chkInvert').checked = invert; }
-  objects = (d.objects || []).map(o => ({ ...o, img: null }));
+  objects = (d.objects || []).map(o => ({ ...o, console: o.console === 'Frei' ? 'Free' : o.console, img: null }));
   curObject = null;
   objects.forEach(o => { if (o.imgSrc) { const im = new Image(); im.onload = () => { o.img = im; draw(); }; im.src = o.imgSrc; } });
-  const finish = () => { rebuildChMap(); buildTileCache(); $('roomName').value = name; undoStack = []; syncSize(); buildPalette(); buildMarkerList(); buildObjectList(); buildObjInspector(); status('<span class="ok">Geladen: ' + name + '</span>'); };
+  const finish = () => { tilePage = 0; rebuildChMap(); buildTileCache(); $('roomName').value = name; undoStack = []; syncSize(); buildPalette(); buildMarkerList(); buildObjectList(); buildObjInspector(); status('<span class="ok">Loaded: ' + name + '</span>'); };
   if (d.tilesSrc) { const img = new Image(); img.onload = () => { tileset.img = img; tileset.count = tileset.defs.length; finish(); }; img.src = d.tilesSrc; }
   else finish();
 }
@@ -808,16 +889,16 @@ function buildProject() {
 function exportProject() {
   const p = buildProject();
   download(p.name.toLowerCase() + '.pixelmap.json', JSON.stringify(p));
-  status('<span class="ok">Projekt gesichert (mit allen Grafiken) — später per „Projekt ↑" weiterarbeiten.</span>');
+  status('<span class="ok">Project downloaded with all graphics. Reopen it later with Project ↑.</span>');
 }
 function importProjectFile(file) {
   const rd = new FileReader();
   rd.onload = () => {
-    let d; try { d = JSON.parse(rd.result); } catch (_) { status('<span class="err">Keine gültige Projektdatei (kein JSON).</span>'); return; }
-    if (!d.layers || !d.cols) { status('<span class="err">Datei ist keine PixelMap-Projektdatei.</span>'); return; }
-    loadRoom(d.name || 'Projekt', d);   // stellt auch curPreset/invert wieder her
+    let d; try { d = JSON.parse(rd.result); } catch (_) { status('<span class="err">This is not a valid JSON project file.</span>'); return; }
+    if (!d.layers || !d.cols) { status('<span class="err">This is not a PixelMap project file.</span>'); return; }
+    loadRoom(d.name || 'Project', d);   // stellt auch curPreset/invert wieder her
   };
-  rd.onerror = () => status('<span class="err">Datei konnte nicht gelesen werden.</span>');
+  rd.onerror = () => status('<span class="err">The file could not be read.</span>');
   rd.readAsText(file);
 }
 
@@ -862,10 +943,10 @@ function resizeMap(nw, nh) {
   layers = [ng, n1, n2]; cols = nw; rows = nh; undoStack = []; syncSize();
 }
 function changeSize() {
-  const w = parseInt(prompt('Breite (Tiles, 1–64):', String(cols)) || '', 10); if (!w) return;
-  const h = parseInt(prompt('Höhe (Tiles, 1–64):', String(rows)) || '', 10); if (!h) return;
+  const w = parseInt(prompt('Width (tiles, 1–64):', String(cols)) || '', 10); if (!w) return;
+  const h = parseInt(prompt('Height (tiles, 1–64):', String(rows)) || '', 10); if (!h) return;
   const cw = Math.max(1, Math.min(64, w)), ch = Math.max(1, Math.min(64, h));
-  resizeMap(cw, ch); status('Größe: ' + cw + '×' + ch + ' (Inhalt erhalten).');
+  resizeMap(cw, ch); status('Map resized to ' + cw + '×' + ch + ' tiles. Existing content was preserved.');
 }
 
 // ---- Karte als fertiges PNG rendern (Tiles + Objekte, kein Gitter) ----
@@ -877,22 +958,22 @@ function renderMapPNG(scale) {
       const ch = layers[li][r][cc]; if (ch == null) continue;
       const idx = chToIdx[ch]; if (idx == null) continue;
       const dx = cc * SRC * scale, dy = r * SRC * scale, ds = SRC * scale;
-      if (recolor && tileCache[idx]) g.drawImage(tileCache[idx], 0, 0, SRC, SRC, dx, dy, ds, ds);
-      else { const [sx, sy] = srcXY(idx); g.drawImage(tileset.img, sx, sy, SRC, SRC, dx, dy, ds, ds); }
+      drawTile(g, idx, dx, dy, ds, ds);
     }
   }
   objects.forEach(o => { if (o.img) g.drawImage(o.img, 0, 0, o.img.naturalWidth, o.img.naturalHeight, o.x * SRC * scale, o.y * SRC * scale, o.tw * SRC * scale, o.th * SRC * scale); });
   return c.toDataURL('image/png');
 }
 function exportPNG() {
-  const s = Math.max(1, Math.min(16, parseInt(prompt('Skalierung (1–16 ×, 1 = 8px pro Tile):', '4') || '', 10) || 4));
+  const s = Math.max(1, Math.min(16, parseInt(prompt('Scale (1–16×; 1 = ' + SRC + 'px per tile):', '4') || '', 10) || 4));
   download(sanitizeName($('roomName').value).toLowerCase() + '.png', null, renderMapPNG(s));
-  status('<span class="ok">PNG gerendert (' + (cols * SRC * s) + '×' + (rows * SRC * s) + 'px).</span>');
+  status('<span class="ok">Rendered PNG at ' + (cols * SRC * s) + '×' + (rows * SRC * s) + 'px.</span>');
 }
 
 // ================= Blatt-Import (RPG-Maker-Stil) =================
 let sheetImg = null, sheetData = null, sheetW = 0, sheetH = 0, sheetZoom = 2;
 let sheetSel = null, sheetDrag = false, sheetPending = null;
+let sheetDrawPending = false;
 
 function transpRgbOrNull() { return $('sheetTranspOn').checked ? hexToRgb($('sheetTransp').value) : null; }
 function openSheetDlg() { $('sheetRegionBar').style.display = 'none'; sheetPending = null; $('sheetDlg').showModal(); if (sheetImg) drawSheet(); }
@@ -904,9 +985,9 @@ function loadSheet(file) {
     const g = oc.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0);
     try { sheetData = g.getImageData(0, 0, sheetW, sheetH).data; } catch (_) { sheetData = null; }
     sheetSel = null; drawSheet();
-    status('Blatt geladen: ' + sheetW + '×' + sheetH + 'px. Rechtsklick setzt die Transparenzfarbe.');
+    status('Loaded sheet: ' + sheetW + '×' + sheetH + 'px. Right-click to sample the transparency color.');
   };
-  img.onerror = () => status('<span class="err">Blatt konnte nicht geladen werden.</span>');
+  img.onerror = () => status('<span class="err">The sheet could not be loaded.</span>');
   img.src = URL.createObjectURL(file);
 }
 function drawSheet() {
@@ -927,6 +1008,11 @@ function drawSheet() {
     g.strokeStyle = '#7cc47c'; g.lineWidth = 2; g.strokeRect(x0 * z + 1, y0 * z + 1, w * z - 2, h * z - 2);
   }
 }
+function requestSheetDraw() {
+  if (sheetDrawPending) return;
+  sheetDrawPending = true;
+  requestAnimationFrame(() => { sheetDrawPending = false; drawSheet(); });
+}
 function sheetCell(e) {
   const r = $('sheetCv').getBoundingClientRect(), z = SRC * sheetZoom;
   const x = Math.floor((e.clientX - r.left) / z), y = Math.floor((e.clientY - r.top) / z);
@@ -935,10 +1021,10 @@ function sheetCell(e) {
 }
 function commitSingleTile(cell) {
   const idx = addTileFromRegion(sheetData, sheetW, cell.x * SRC, cell.y * SRC, transpRgbOrNull());
-  if (idx == null) { status('Zelle ist leer/transparent.'); return; }
-  tilesReady = true; buildTileCache(); curTile = idx; curStamp = null;
+  if (idx == null) { status('This cell is empty or transparent.'); return; }
+  tilesReady = true; buildTileCache(); curTile = idx; tilePage = Math.floor(idx / TILE_PAGE_SIZE); curStamp = null;
   buildPalette(); refreshPalSel(); draw();
-  status('<span class="ok">Tile übernommen (#' + idx + ').</span>');
+  status('<span class="ok">Added tile #' + idx + '.</span>');
 }
 function makeStamp(x0, y0, w, h) {
   const tiles = [];
@@ -952,7 +1038,7 @@ function makeStamp(x0, y0, w, h) {
   tilesReady = true; buildTileCache();
   curStamp = { w, h, tiles }; curTile = -2; curObject = null;
   buildPalette(); draw();
-  status('<span class="ok">Stempel ' + w + '×' + h + ' bereit — auf die Karte klicken (aktive Tile-Ebene).</span>');
+  status('<span class="ok">' + w + '×' + h + ' stamp ready. Click the map on an active tile layer.</span>');
   $('sheetDlg').close();
 }
 function makeObjectFromRegion(x0, y0, w, h) {
@@ -969,10 +1055,10 @@ function makeObjectFromRegion(x0, y0, w, h) {
   const src = oc.toDataURL('image/png'); const im = new Image();
   im.onload = () => {
     pushUndo();
-    objects.push({ name: 'obj' + (objects.length + 1), x: 1, y: 1, tw: w, th: h, console: 'Frei', img: im, imgSrc: src });
+    objects.push({ name: 'obj' + (objects.length + 1), x: 1, y: 1, tw: w, th: h, console: 'Free', img: im, imgSrc: src });
     curObject = objects.length - 1; curMarker = null; curStamp = null;
     if (activeLayer !== 'events') setActiveLayer('events'); else { buildObjectList(); buildObjInspector(); draw(); }
-    status('<span class="ok">Objekt aus Region (' + pw + '×' + ph + 'px). Auf die Karte klicken.</span>');
+    status('<span class="ok">Created an object from the ' + pw + '×' + ph + 'px region. Click the map to place it.</span>');
   };
   im.src = src;
   $('sheetDlg').close();
@@ -992,7 +1078,7 @@ function regionDataURL(tx0, ty0, tw, th, transp) {
 }
 // Zusammenhängende Formen (durch Transparenzfarbe getrennt) finden → je ein Objekt
 function autoDetectObjects() {
-  if (!sheetData) { status('Erst ein Blatt laden.'); return; }
+  if (!sheetData) { status('Load a sheet first.'); return; }
   const transp = transpRgbOrNull();
   const W = sheetW, H = sheetH, solid = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
@@ -1024,7 +1110,7 @@ function autoDetectObjects() {
     if (tw * th > 64 || tw > 12 || th > 12) return;   // zu groß → vermutlich Terrain
     found.push({ tx0, ty0, tw, th });
   });
-  if (!found.length) { status('<span class="warn">Keine getrennten Objekte gefunden — Transparenzfarbe gesetzt? (Rechtsklick aufs Blatt)</span>'); return; }
+  if (!found.length) { status('<span class="warn">No separate objects found. Try sampling the transparency color with a right-click.</span>'); return; }
   pushUndo();
   let px = 0, py = 0, rowH = 0;
   found.forEach((o, k) => {
@@ -1032,11 +1118,11 @@ function autoDetectObjects() {
     const ox = px, oy = py; rowH = Math.max(rowH, o.th); px += o.tw + 1;
     const src = regionDataURL(o.tx0, o.ty0, o.tw, o.th, transp);
     const im = new Image(); im.onload = () => draw(); im.src = src;
-    objects.push({ name: 'obj' + (objects.length + 1), x: ox, y: oy, tw: o.tw, th: o.th, console: 'Frei', img: im, imgSrc: src });
+    objects.push({ name: 'obj' + (objects.length + 1), x: ox, y: oy, tw: o.tw, th: o.th, console: 'Free', img: im, imgSrc: src });
   });
   curObject = objects.length - 1; curMarker = null; curStamp = null;
   setActiveLayer('events');
-  status('<span class="ok">' + found.length + ' Objekte erkannt und platziert (verschiebbar).</span>');
+  status('<span class="ok">Detected and placed ' + found.length + ' movable object(s).</span>');
   $('sheetDlg').close();
 }
 
@@ -1052,12 +1138,13 @@ function createRoom() {
   const w = Math.max(1, Math.min(64, parseInt($('newW').value, 10) || 20));
   const h = Math.max(1, Math.min(64, parseInt($('newH').value, 10) || 18));
   setTileSize(px);
+  tilePage = 0;
   rebuildBuiltinAtlas();
   tilesReady = true; buildTileCache();
   newMap(w, h);
   buildPalette();
   $('newDlg').close();
-  status('Neues Projekt: ' + w + '×' + h + ' Tiles à ' + px + '×' + px + 'px.');
+  status('New project: ' + w + '×' + h + ' tiles at ' + px + '×' + px + 'px.');
 }
 
 // ================= Wire up =================
@@ -1083,6 +1170,10 @@ $('projFile').onchange = e => { const f = e.target.files[0]; if (f) importProjec
 $('btnCheck').onclick = checkBorder;
 $('btnExport').onclick = openExport;
 $('btnUpload').onclick = () => $('fileInput').click();
+$('tilePrev').onclick = () => { if (tilePage > 0) { tilePage--; buildPalette(); } };
+$('tileNext').onclick = () => {
+  if ((tilePage + 1) * TILE_PAGE_SIZE < tileset.defs.length) { tilePage++; buildPalette(); }
+};
 $('btnAddObject').onclick = () => $('objFile').click();
 $('btnSheet').onclick = openSheetDlg;
 $('sheetClose').onclick = () => $('sheetDlg').close();
@@ -1102,24 +1193,24 @@ $('sheetObject').onclick = () => { if (sheetPending) makeObjectFromRegion(sheetP
     const si = (py * sheetW + px) * 4;
     const hex = '#' + [sheetData[si], sheetData[si+1], sheetData[si+2]].map(v => v.toString(16).padStart(2, '0')).join('');
     $('sheetTransp').value = hex; $('sheetTranspOn').checked = true;
-    status('Transparenzfarbe: ' + hex);
+    status('Transparency color: ' + hex);
   });
   scv.addEventListener('mousedown', e => { if (e.button !== 0 || !sheetData) return; const c = sheetCell(e); sheetDrag = true; sheetSel = { x0: c.x, y0: c.y, x1: c.x, y1: c.y }; $('sheetRegionBar').style.display = 'none'; drawSheet(); });
-  scv.addEventListener('mousemove', e => { if (!sheetDrag) return; const c = sheetCell(e); sheetSel.x1 = c.x; sheetSel.y1 = c.y; drawSheet(); });
+  scv.addEventListener('mousemove', e => { if (!sheetDrag) return; const c = sheetCell(e); sheetSel.x1 = c.x; sheetSel.y1 = c.y; requestSheetDraw(); });
   window.addEventListener('mouseup', () => {
     if (!sheetDrag) return; sheetDrag = false; if (!sheetSel) return;
     const x0 = Math.min(sheetSel.x0, sheetSel.x1), y0 = Math.min(sheetSel.y0, sheetSel.y1);
     const w = Math.abs(sheetSel.x1 - sheetSel.x0) + 1, h = Math.abs(sheetSel.y1 - sheetSel.y0) + 1;
     if (w === 1 && h === 1) { commitSingleTile({ x: x0, y: y0 }); sheetSel = null; drawSheet(); }
-    else { sheetPending = { x0, y0, w, h }; $('sheetRegionInfo').textContent = 'Region ' + w + '×' + h + ' Tiles (' + (w * SRC) + '×' + (h * SRC) + 'px)'; $('sheetRegionBar').style.display = 'flex'; }
+    else { sheetPending = { x0, y0, w, h }; $('sheetRegionInfo').textContent = 'Region: ' + w + '×' + h + ' tiles (' + (w * SRC) + '×' + (h * SRC) + 'px)'; $('sheetRegionBar').style.display = 'flex'; }
   });
 })();
 $('btnCloseExport').onclick = () => $('exportDlg').close();
 $('btnCloseLoad').onclick = () => $('loadDlg').close();
 $('chkLegend').onchange = () => { $('exportText').value = mapToText(); };
-$('btnCopyTxt').onclick = () => copy(mapToText(), 'Text kopiert.');
+$('btnCopyTxt').onclick = () => copy(mapToText(), 'Text copied.');
 $('btnDownloadTxt').onclick = () => download(sanitizeName($('roomName').value).toLowerCase() + '.txt', mapToText());
-$('btnCArray').onclick = () => { const c = mapToCArray(); $('exportText').value = c; copy(c, 'C-Array kopiert.'); };
+$('btnCArray').onclick = () => { const c = mapToCArray(); $('exportText').value = c; copy(c, 'C array copied.'); };
 $('btnJsonSave').onclick = () => exportJSON(false);
 $('btnJsonCopy').onclick = () => exportJSON(true);
 $('btnAssets').onclick = exportAssets;
@@ -1129,6 +1220,44 @@ $('btnAddMarker').onclick = () => {
   curMarker = n; $('newMarker').value = ''; buildMarkerList();
 };
 window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); } });
+
+// Resizable sidebar. The width is kept as a local UI preference.
+(() => {
+  const panel = $('panel'), handle = $('panelResize');
+  const widthKey = 'pixelmap_sidebar_width';
+  try {
+    const saved = parseInt(localStorage.getItem(widthKey), 10);
+    if (saved) panel.style.width = Math.max(210, Math.min(window.innerWidth * .6, saved)) + 'px';
+  } catch (_) {}
+  const setWidth = width => {
+    const max = Math.min(window.innerWidth * .6, 720);
+    panel.style.width = Math.max(210, Math.min(max, width)) + 'px';
+  };
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    document.body.classList.add('resizing-sidebar');
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    setWidth(e.clientX);
+  });
+  const finishResize = e => {
+    if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
+    handle.classList.remove('dragging');
+    document.body.classList.remove('resizing-sidebar');
+    try { localStorage.setItem(widthKey, String(Math.round(panel.getBoundingClientRect().width))); } catch (_) {}
+  };
+  handle.addEventListener('pointerup', finishResize);
+  handle.addEventListener('pointercancel', finishResize);
+  handle.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    setWidth(panel.getBoundingClientRect().width + (e.key === 'ArrowRight' ? 16 : -16));
+    try { localStorage.setItem(widthKey, String(Math.round(panel.getBoundingClientRect().width))); } catch (_) {}
+  });
+})();
 
 // Basis-Tiles laden und auf die aktuelle Tile-Größe skaliert in einen Atlas legen
 const builtinImg = new Image();
@@ -1141,7 +1270,7 @@ function rebuildBuiltinAtlas() {
   rebuildChMap(); rebuildTileHashes();
 }
 builtinImg.onload = () => { rebuildBuiltinAtlas(); tilesReady = true; buildTileCache(); buildPalette(); draw(); };
-builtinImg.onerror = () => status('<span class="err">Tileset konnte nicht geladen werden.</span>');
+builtinImg.onerror = () => status('<span class="err">The built-in tileset could not be loaded.</span>');
 builtinImg.src = BUILTIN_PNG;
 
 // ================= Init =================

@@ -1,41 +1,40 @@
 # PixelMap
 
-Ein bewusst simpler Tile-Map-Editor für Pixel-/Retro-Spiele — Tile-Palette links,
-Klick-Leinwand rechts, sonst nichts. Läuft offline im Browser, kein Build,
-keine Abhängigkeiten.
+A deliberately focused tile map editor for pixel and retro games: tile palette
+on the left, map canvas on the right. It runs offline in the browser with no
+dependencies or build step.
 
-## Benutzen
+## Use it
 
-`index.html` doppelklicken — fertig. (Oder über GitHub Pages öffnen.)
+Double-click `index.html`, or host the three files on any static web server.
 
-## Dateien
+## Files
 
-- `index.html` — Struktur (Header, Panels, Dialoge)
-- `styles.css` — das gesamte Aussehen
-- `app.js` — die komplette Logik (mit `// ===` Abschnitts-Bannern: Tileset, Paletten,
-  Rendering, Ebenen, Blatt-Import, Export …)
+- `index.html` — page structure, panels, and dialogs
+- `styles.css` — the complete visual design
+- `app.js` — editor logic: tilesets, palettes, rendering, layers, sheet import,
+  saving, and export
 
-Drei Dateien, kein Build-Schritt — einfach die drei zusammen ausliefern/pushen.
+## Features
 
-## Was es kann
-
-- **3 Tile-Ebenen** (Boden / Objekt 1 / Objekt 2) + **Events-Ebene** (benannte Marker/Spawns)
-- **Raster-Palette** wie im RPG Maker, transparentes Compositing in der Vorschau
-- **Paletten**: 8 wählbare 4-Farben-Sets, Vorschau wird auf Konsolen-Optik umgefärbt
-- **Objekte/Sprites**: eigene Grafiken laden, platzieren, Größe nach Konsole (GB/GBA/SNES/…)
-- **Blatt-Import** (RPG-Maker-Stil): großes Grafik-Blatt laden, Zelle klicken = Palette-Tile,
-  Region ziehen = Stempel oder Objekt; Farbschlüssel-Transparenz, Dubletten-Erkennung
-- **Rand-Check**, Undo, Speichern/Laden (im Browser)
+- 8×8, 16×16, and 32×32 tileset imports
+- Three tile layers (Ground, Object 1, Object 2) and an Events layer
+- Responsive RPG Maker-style tile grid with pagination for large tilesets
+- Resizable left sidebar; its width is remembered in the browser
+- Eight editable four-color palette slots with live console-style recoloring
+- Importable objects and sprites with common GB/GBA/SNES/NES/Mega Drive sizes
+- RPG Maker-style sheet import: click a cell for one tile or drag a region to
+  create a stamp or object
+- Color-key transparency, tile deduplication, border checks, undo, and local saves
 
 ## Export
 
-- **JSON** (selbst-enthalten, Grafiken als base64) — für Unity, GBDK & Co.
-  Enthält Zeichen-Raster *und* ein pixel-gebackenes Tileset + Index-Karte.
-- Zeichen-Raster als `.txt`
-- C-Array (`ROOM_M[]`) zum Kopieren
+- Self-contained JSON with base64 graphics for Unity, GBDK, and other engines
+- Baked tileset PNG plus tile-index map CSV
+- Character map as `.txt`
+- Copyable C array (`ROOM_M[]`)
+- Rendered map PNG
 
-## Format
-
-Der JSON-Export folgt `{"format":"pixelmap-room","version":1, …}` mit `size`, `palettes`,
-`tiles`, `layers`, `tileset`, `baked` (Compositing) und `objects`. Engines lesen die JSON
-direkt (Unity) oder über ein kleines Build-Skript (GBDK: JSON → `tiles.h` + Arrays).
+The JSON export uses `{"format":"pixelmap-room","version":1, …}` and contains
+`size`, `palettes`, `tiles`, `layers`, `tileset`, `baked`, `objects`, and
+`markers`.

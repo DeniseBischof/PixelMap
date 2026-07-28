@@ -1,6 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>PixelMap — Tile Map Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PixelMap — Game Boy Tile Map Editor</title>
 <link rel="stylesheet" href="styles.css">
+</head>
+<body>
 
 <header>
   <div class="brand">
@@ -11,151 +17,170 @@
     </div>
   </div>
   <div class="toolbar">
-    <button id="btnUndo" title="Rückgängig (Strg+Z)">Undo</button>
-    <label class="field"><input type="checkbox" id="chkGrid" checked> Gitter</label>
-    <label class="field"><input type="checkbox" id="chkDim" checked> andere Ebenen abdunkeln</label>
-    <label class="field"><input type="checkbox" id="chkRecolor" checked> GBC-Farben</label>
-    <label class="field" title="Hell/Dunkel-Stufen tauschen"><input type="checkbox" id="chkInvert"> Invertieren</label>
+    <button id="btnUndo" title="Undo (Ctrl+Z)">Undo</button>
+    <label class="field"><input type="checkbox" id="chkGrid" checked> Grid</label>
+    <label class="field"><input type="checkbox" id="chkDim" checked> Dim other layers</label>
+    <label class="field"><input type="checkbox" id="chkRecolor" checked> GBC colors</label>
+    <label class="field" title="Swap light and dark levels"><input type="checkbox" id="chkInvert"> Invert</label>
     <label class="field">Palette <select id="palPreset"></select></label>
-    <button id="btnPalettes" title="Farben feinjustieren">Feintuning…</button>
+    <button id="btnPalettes" title="Fine-tune palette colors">Fine-tune…</button>
     <span style="width:1px;height:20px;background:var(--line)"></span>
-    <button id="btnNew">Neu</button>
-    <button id="btnResize" title="Größe ändern, Inhalt bleibt">Größe…</button>
-    <button id="btnSave" title="Schnellspeichern im Browser (localStorage)">Speichern</button>
-    <button id="btnLoad" title="Aus dem Browser laden">Laden</button>
-    <button id="btnProjSave" title="Projekt als Datei sichern — mit allen Grafiken, zum Weitermachen/Teilen">Projekt ↓</button>
-    <button id="btnProjOpen" title="Projektdatei öffnen und weiterarbeiten">Projekt ↑</button>
+    <button id="btnNew">New</button>
+    <button id="btnResize" title="Resize while keeping map contents">Resize…</button>
+    <button id="btnSave" title="Quick-save in this browser">Save</button>
+    <button id="btnLoad" title="Load from this browser">Load</button>
+    <button id="btnProjSave" title="Download the complete project, including graphics">Project ↓</button>
+    <button id="btnProjOpen" title="Open a PixelMap project file">Project ↑</button>
     <input type="file" id="projFile" accept="application/json,.json" style="display:none">
     <span style="width:1px;height:20px;background:var(--line)"></span>
     <label class="field">Name <input type="text" id="roomName" value="ROOM" style="width:110px"></label>
-    <button id="btnCheck">Rand prüfen</button>
+    <button id="btnCheck">Check border</button>
     <button id="btnExport" class="primary">Export</button>
   </div>
 </header>
 
 <main>
   <aside id="panel">
-    <div class="section-title">Ebenen</div>
+    <div class="section-title">Layers</div>
     <div id="layerList"></div>
 
     <div class="section-title" id="paletteTitle">Tiles</div>
+    <div id="tilePager" class="tile-pager" aria-label="Tile palette navigation">
+      <span id="tileRange">0 tiles</span>
+      <span class="pager-actions">
+        <button id="tilePrev" type="button" title="Previous tiles" aria-label="Previous tiles">‹</button>
+        <button id="tileNext" type="button" title="Next tiles" aria-label="Next tiles">›</button>
+      </span>
+    </div>
     <div id="swatches"></div>
     <div id="tileInspector"></div>
-    <button id="btnUpload" style="width:100%;margin-top:8px">Tileset laden — PNG, 8×8-Gitter</button>
+    <div class="tileset-import">
+      <label class="field" for="tilesetSize">Tile size
+        <select id="tilesetSize">
+          <option value="8">8×8</option>
+          <option value="16">16×16</option>
+          <option value="32">32×32</option>
+        </select>
+      </label>
+      <button id="btnUpload">Import tileset PNG</button>
+    </div>
     <input type="file" id="fileInput" accept="image/png,image/*" style="display:none">
-    <button id="btnSheet" style="width:100%;margin-top:4px">Blatt laden — Region wählen</button>
-    <div class="hint" style="margin-top:6px">Blatt = großes Grafik-Blatt, aus dem du Zellen/Regionen pickst. Tileset = fertiges 8×8-Gitter. Zeichen/Palette im Inspektor.</div>
+    <button id="btnSheet" style="width:100%;margin-top:4px">Open sheet — select a region</button>
+    <div class="hint" style="margin-top:6px">Tileset PNGs are sliced using the selected tile size. Use Sheet mode to pick cells, stamps, or objects from a larger image.</div>
 
     <div id="eventPanel" style="display:none">
-      <div class="section-title">Objekte (Sprites)</div>
+      <div class="section-title">Objects (sprites)</div>
       <div id="objectList"></div>
-      <button id="btnAddObject" style="width:100%;margin-top:6px">Objekt-Grafik laden — PNG</button>
+      <button id="btnAddObject" style="width:100%;margin-top:6px">Import object graphic — PNG</button>
       <input type="file" id="objFile" accept="image/png,image/*" style="display:none">
       <div id="objInspector"></div>
 
-      <div class="section-title">Marker / Spawns</div>
+      <div class="section-title">Markers / spawns</div>
       <div id="markerList"></div>
       <div style="display:flex;gap:6px;margin-top:8px">
-        <input type="text" id="newMarker" placeholder="neuer Name" style="flex:1">
+        <input type="text" id="newMarker" placeholder="new name" style="flex:1">
         <button id="btnAddMarker">+</button>
       </div>
-      <div class="hint" style="margin-top:6px">Objekt oder Marker wählen, dann auf die Karte klicken (setzt/verschiebt). Gleicher Marker nochmal = löschen.</div>
+      <div class="hint" style="margin-top:6px">Select an object or marker, then click the map to place or move it. Click the same marker position again to remove it.</div>
     </div>
   </aside>
+  <div id="panelResize" role="separator" aria-orientation="vertical" aria-label="Resize left sidebar" tabindex="0"></div>
 
   <section id="stage">
     <div id="wrap"><canvas id="grid"></canvas></div>
   </section>
 </main>
 
-<div id="status">Bereit.</div>
+<div id="status">Ready.</div>
 
 <dialog id="exportDlg">
   <div class="dlg-body">
     <h2 id="exportTitle">Export</h2>
-    <label class="field" style="margin-bottom:8px"><input type="checkbox" id="chkLegend"> Tile-Eigenschaften als Kommentar anhängen</label>
+    <label class="field" style="margin-bottom:8px"><input type="checkbox" id="chkLegend"> Include tile properties as comments</label>
     <textarea id="exportText" spellcheck="false"></textarea>
     <div class="dlg-actions">
-      <button id="btnCopyTxt">Text kopieren</button>
-      <button id="btnDownloadTxt">.txt speichern</button>
-      <button id="btnCArray">C-Array kopieren</button>
-      <button id="btnJsonCopy">JSON kopieren</button>
-      <button id="btnJsonSave" class="primary">JSON speichern</button>
-      <button id="btnPng">Als PNG-Bild</button>
-      <button id="btnAssets" title="Gebackenes Tileset-PNG + Index-Karte als CSV — für gfx4snes/Unity/Tiled">Tileset-PNG + Map-CSV</button>
-      <button id="btnCloseExport">Schließen</button>
+      <button id="btnCopyTxt">Copy text</button>
+      <button id="btnDownloadTxt">Save .txt</button>
+      <button id="btnCArray">Copy C array</button>
+      <button id="btnJsonCopy">Copy JSON</button>
+      <button id="btnJsonSave" class="primary">Save JSON</button>
+      <button id="btnPng">Export PNG</button>
+      <button id="btnAssets" title="Baked tileset PNG and tile-index map CSV for gfx4snes, Unity, Tiled, etc.">Tileset PNG + map CSV</button>
+      <button id="btnCloseExport">Close</button>
     </div>
   </div>
 </dialog>
 
 <dialog id="newDlg">
   <div class="dlg-body">
-    <h2>Neues Projekt</h2>
-    <div class="section-title" style="margin-top:0">Tile-Größe</div>
+    <h2>New project</h2>
+    <div class="section-title" style="margin-top:0">Tile size</div>
     <div id="sizeOpts">
       <label class="sizeopt"><input type="radio" name="tsz" value="8" checked> <b>8×8</b><span class="use">Game Boy (GBDK) · NES · PICO-8 · Master System</span></label>
       <label class="sizeopt"><input type="radio" name="tsz" value="16"> <b>16×16</b><span class="use">SNES (PVSnesLib) · RPG Maker 2003 · GBA · Mega Drive</span></label>
-      <label class="sizeopt"><input type="radio" name="tsz" value="32"> <b>32×32</b><span class="use">RPG Maker XP/VX · Unity · moderne Indie-Pixel-Games</span></label>
+      <label class="sizeopt"><input type="radio" name="tsz" value="32"> <b>32×32</b><span class="use">RPG Maker XP/VX · Unity · modern indie pixel games</span></label>
       <label class="sizeopt"><input type="radio" name="tsz" value="48"> <b>48×48</b><span class="use">RPG Maker MV/MZ</span></label>
     </div>
-    <div class="section-title">Kartengröße (Tiles)</div>
+    <div class="section-title">Map size (tiles)</div>
     <div style="display:flex;gap:8px;align-items:center">
-      <label class="field">Breite <input type="number" id="newW" min="1" max="64" value="20" style="width:64px"></label>
-      <label class="field">Höhe <input type="number" id="newH" min="1" max="64" value="18" style="width:64px"></label>
+      <label class="field">Width <input type="number" id="newW" min="1" max="64" value="20" style="width:64px"></label>
+      <label class="field">Height <input type="number" id="newH" min="1" max="64" value="18" style="width:64px"></label>
       <span class="hint">max 64×64</span>
     </div>
-    <div class="hint" style="margin-top:10px">Erstellt eine leere Karte. Die Basis-Tiles werden auf die gewählte Größe skaliert; eigene Tilesets/Blätter werden in dieser Größe geschnitten.</div>
+    <div class="hint" style="margin-top:10px">Creates an empty map. Built-in tiles are scaled to the selected size; imported tilesets and sheets are sliced at that size.</div>
     <div class="dlg-actions">
-      <button id="newCancel">Abbrechen</button>
-      <button id="newCreate" class="primary">Erstellen</button>
+      <button id="newCancel">Cancel</button>
+      <button id="newCreate" class="primary">Create</button>
     </div>
   </div>
 </dialog>
 
 <dialog id="loadDlg">
   <div class="dlg-body">
-    <h2>Gespeicherte Räume</h2>
+    <h2>Saved rooms</h2>
     <div id="loadList"></div>
-    <div class="dlg-actions"><button id="btnCloseLoad" class="primary">Schließen</button></div>
+    <div class="dlg-actions"><button id="btnCloseLoad" class="primary">Close</button></div>
   </div>
 </dialog>
 
 <dialog id="palDlg">
   <div class="dlg-body">
-    <h2>Paletten-Feintuning (8 Slots × 4 Farben)</h2>
-    <div class="hint" style="margin-bottom:10px">Feinjustierung des gewählten Presets. Reihenfolge hell → dunkel; färbt Vorschau &amp; Export sofort um.</div>
+    <h2>Palette fine-tuning (8 slots × 4 colors)</h2>
+    <div class="hint" style="margin-bottom:10px">Adjust the selected preset. Colors run light to dark and update the preview and exports immediately.</div>
     <div id="palEdit"></div>
     <div class="dlg-actions">
-      <button id="btnPalReset">Preset zurücksetzen</button>
-      <button id="btnClosePal" class="primary">Schließen</button>
+      <button id="btnPalReset">Reset preset</button>
+      <button id="btnClosePal" class="primary">Close</button>
     </div>
   </div>
 </dialog>
 
 <dialog id="sheetDlg">
   <div class="dlg-body" style="max-width:none;width:min(88vw,900px)">
-    <h2>Tileset-Blatt (RPG-Maker-Stil)</h2>
+    <h2>Tileset sheet (RPG Maker style)</h2>
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-      <button id="sheetPick">PNG wählen…</button>
+      <button id="sheetPick">Choose PNG…</button>
       <input type="file" id="sheetFile" accept="image/png,image/*" style="display:none">
-      <label class="field"><input type="checkbox" id="sheetTranspOn" checked> Farbschlüssel</label>
-      <label class="field">Farbe <input type="color" id="sheetTransp" value="#808080"></label>
+      <label class="field"><input type="checkbox" id="sheetTranspOn" checked> Color key</label>
+      <label class="field">Color <input type="color" id="sheetTransp" value="#808080"></label>
       <label class="field">Zoom
         <select id="sheetZoom"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
-      <button id="sheetAuto" class="primary">Objekte automatisch erkennen</button>
+      <button id="sheetAuto" class="primary">Auto-detect objects</button>
     </div>
-    <div class="hint" style="margin-bottom:8px">Linksklick Zelle = Palette-Tile · Rechteck ziehen = Stempel/Objekt · Rechtsklick = Transparenzfarbe pipettieren</div>
+    <div class="hint" style="margin-bottom:8px">Left-click a cell to add a tile · Drag a rectangle for a stamp/object · Right-click to sample the transparency color</div>
     <div id="sheetWrap" style="max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:6px;
       background:repeating-conic-gradient(#2a2d1f 0% 25%,#23261b 0% 50%) 0 / 16px 16px">
       <canvas id="sheetCv" style="display:block;image-rendering:pixelated"></canvas>
     </div>
     <div id="sheetRegionBar" style="display:none;align-items:center;gap:8px;margin-top:8px">
       <span class="hint" id="sheetRegionInfo"></span>
-      <button id="sheetStamp" class="primary">Als Stempel übernehmen</button>
-      <button id="sheetObject">Als Objekt übernehmen</button>
+      <button id="sheetStamp" class="primary">Use as stamp</button>
+      <button id="sheetObject">Use as object</button>
     </div>
-    <div class="dlg-actions"><button id="sheetClose" class="primary">Schließen</button></div>
+    <div class="dlg-actions"><button id="sheetClose" class="primary">Close</button></div>
   </div>
 </dialog>
 
 <script src="app.js"></script>
+</body>
+</html>
