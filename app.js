@@ -108,6 +108,8 @@ let curObject = null;          // Index in objects | null
 let activeLayer = 0;           // 0..2 | 'events'
 let curTile = 0;               // Index in tiledefs, oder -1 = Radierer
 let curStamp = null;           // {w,h,tiles:[[char|null]]} — Mehrfach-Tile-Pinsel aus dem Blatt
+let autotileGroups = [];       // {name, mode, variants[]} using source-sheet order
+let curAutoTile = null;        // active autotile group index | null
 let curMarker = null;
 let showGrid = true, dimOthers = true;
 let recolor = true;            // GBC-Farben: Tiles auf 4 Stufen quantisieren + Palette einfärben
@@ -183,6 +185,63 @@ function classifyPalette(r, g, b) {
   if (hh < 165) return (mx < 150 ? 5 : 0);    // dunkelgrün→Laub, grün→Gras
   if (hh < 255) return 1;                     // cyan/blau → Wasser
   return 6;                                   // violett → Blüten
+}
+function analyzeTileRegion(data, srcW, sx, sy, size) {
+  const scores = palettes.map(() => 0);
+  const step = Math.max(1, Math.floor(size / 12));
+  let samples = 0, sr = 0, sg = 0, sb = 0;
+  for (let y = 0; y < size; y += step) for (let x = 0; x < size; x += step) {
+    const si = ((sy + y) * srcW + sx + x) * 4;
+    const a = data[si + 3];
+    if (a < 16) continue;
+    const r = data[si], g = data[si + 1], b = data[si + 2];
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+    const weight = .4 + chroma / 255;
+    samples++; sr += r; sg += g; sb += b;
+    palettes.forEach((palette, pi) => {
+      let nearest = Infinity;
+      palette.rgb.forEach(color => {
+        const dr = r - color[0], dg = g - color[1], db = b - color[2];
+        const distance = .25 * dr * dr + .55 * dg * dg + .2 * db * db;
+        if (distance < nearest) nearest = distance;
+      });
+      scores[pi] += nearest * weight;
+    });
+  }
+  if (!samples) return { empty: true, pal: 7 };
+  let best = 0;
+  for (let i = 1; i < scores.length; i++) if (scores[i] < scores[best]) best = i;
+  const semantic = classifyPalette(sr / samples, sg / samples, sb / samples);
+  if (scores[semantic] <= scores[best] * 1.1 + 1) best = semantic;
+  return { empty: false, pal: best };
+}
+function analyzeTilesetImage(img, tileSize, tilesPerRow, count) {
+  const width = img.naturalWidth || img.width, height = img.naturalHeight || img.height;
+  const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+  const g = canvas.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false;
+  try {
+    g.drawImage(img, 0, 0);
+    const data = g.getImageData(0, 0, width, height).data;
+    return Array.from({ length: count }, (_, i) => {
+      const sx = (i % tilesPerRow) * tileSize;
+      const sy = Math.floor(i / tilesPerRow) * tileSize;
+      return analyzeTileRegion(data, width, sx, sy, tileSize);
+    });
+  } catch (_) {
+    return Array.from({ length: count }, () => ({ empty: false, pal: 7 }));
+  }
+}
+function autoAssignPalettes(showMessage = true) {
+  if (!tilesReady || !tileset.img) return;
+  const analysis = analyzeTilesetImage(tileset.img, SRC, tileset.tilesPerRow, tileset.defs.length);
+  let visible = 0;
+  tileset.defs.forEach((def, i) => {
+    def.pal = analysis[i].pal;
+    def.empty = analysis[i].empty;
+    if (!def.empty) visible++;
+  });
+  buildTileCache(); draw(); buildPalette();
+  if (showMessage) status('<span class="ok">Matched ' + visible + ' visible tiles to the closest available palettes.</span>');
 }
 // extrahiert 8×8 aus Quellpixeln (mit Farbschlüssel), gibt Tile-Index zurück (dedupliziert). null wenn komplett leer.
 function addTileFromRegion(data, srcW, sx, sy, transpRgb) {
@@ -267,6 +326,7 @@ function newMap(w, h) {
   layers = [ground, blankLayer(w, h, null), blankLayer(w, h, null)];
   markers = {}; markerOrder = [];
   objects = []; curObject = null;
+  autotileGroups = []; curAutoTile = null;
   undoStack = [];
   syncSize();
 }
@@ -362,38 +422,50 @@ function setActiveLayer(l) {
 }
 
 // ================= Palette UI (Raster + Inspektor) =================
+function tilePageMetrics(page = tilePage) {
+  const columns = Math.max(1, tileset.tilesPerRow || 1);
+  const totalRows = Math.max(1, Math.ceil(tileset.defs.length / columns));
+  const rowsPerPage = Math.max(1, Math.floor(TILE_PAGE_SIZE / columns));
+  const pages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+  const safePage = Math.max(0, Math.min(pages - 1, page));
+  const startRow = safePage * rowsPerPage;
+  const endRow = Math.min(totalRows, startRow + rowsPerPage);
+  return {
+    columns, totalRows, rowsPerPage, pages, page: safePage, startRow, endRow,
+    start: startRow * columns,
+    end: Math.min(tileset.defs.length, endRow * columns)
+  };
+}
+function pageForTile(index) {
+  const info = tilePageMetrics(0);
+  return Math.floor(Math.floor(index / info.columns) / info.rowsPerPage);
+}
 function updateTilePager() {
-  const pages = Math.max(1, Math.ceil(tileset.defs.length / TILE_PAGE_SIZE));
-  tilePage = Math.max(0, Math.min(pages - 1, tilePage));
-  const start = tileset.defs.length ? tilePage * TILE_PAGE_SIZE + 1 : 0;
-  const end = Math.min(tileset.defs.length, (tilePage + 1) * TILE_PAGE_SIZE);
-  $('tileRange').textContent = tileset.defs.length > TILE_PAGE_SIZE
-    ? start + '–' + end + ' of ' + tileset.defs.length + ' tiles'
-    : tileset.defs.length + (tileset.defs.length === 1 ? ' tile' : ' tiles');
+  const info = tilePageMetrics();
+  tilePage = info.page;
+  const start = tileset.defs.length ? info.start + 1 : 0;
+  $('tileRange').textContent = info.pages > 1
+    ? 'Rows ' + (info.startRow + 1) + '–' + info.endRow + ' of ' + info.totalRows +
+      ' · cells ' + start + '–' + info.end
+    : tileset.defs.length + (tileset.defs.length === 1 ? ' cell' : ' cells');
   $('tilePrev').disabled = tilePage <= 0;
-  $('tileNext').disabled = tilePage >= pages - 1;
+  $('tileNext').disabled = tilePage >= info.pages - 1;
 }
 function buildPalette() {
   const box = $('swatches'); box.innerHTML = '';
   if (activeLayer === 'events') { buildInspector(); return; }
   updateTilePager();
-  // Radierer nur auf Objekt-Ebenen sinnvoll (Boden hat immer ein Tile)
-  if (activeLayer !== 0) {
-    const er = document.createElement('canvas');
-    er.className = 'swatch eraser' + (curTile === -1 ? ' sel' : '');
-    er.width = 34; er.height = 34; er.title = 'Eraser (empty)';
-    er.onclick = () => { curTile = -1; curStamp = null; refreshPalSel(); buildInspector(); };
-    box.appendChild(er);
-  }
-  const start = tilePage * TILE_PAGE_SIZE;
-  const end = Math.min(tileset.defs.length, start + TILE_PAGE_SIZE);
-  for (let i = start; i < end; i++) {
+  const info = tilePageMetrics();
+  box.style.gridTemplateColumns = 'repeat(' + info.columns + ', 34px)';
+  $('tileErase').style.display = activeLayer === 0 ? 'none' : 'block';
+  $('tileErase').classList.toggle('active', curTile === -1);
+  for (let i = info.start; i < info.end; i++) {
     const d = tileset.defs[i];
     const sc = document.createElement('canvas');
-    sc.className = 'swatch' + (curTile === i ? ' sel' : '');
+    sc.className = 'swatch' + (curTile === i ? ' sel' : '') + (d.empty ? ' empty' : '');
     sc.width = 34; sc.height = 34; sc.dataset.i = i;
-    sc.title = (d.ch || '?') + ' · ' + d.name;
-    sc.onclick = () => { curTile = i; curStamp = null; refreshPalSel(); buildInspector(); };
+    sc.title = d.empty ? 'Empty source cell' : (d.ch || '?') + ' · ' + d.name;
+    if (!d.empty) sc.onclick = () => { curTile = i; curStamp = null; curAutoTile = null; refreshPalSel(); buildInspector(); };
     box.appendChild(sc);
   }
   drawSwatches();
@@ -402,22 +474,66 @@ function buildPalette() {
 function drawSwatches() {
   if (!tilesReady) return;
   document.querySelectorAll('#swatches canvas[data-i]').forEach(sc => {
-    const i = +sc.dataset.i, g = sc.getContext('2d'); g.imageSmoothingEnabled = false;
+    const i = +sc.dataset.i;
+    if (tileset.defs[i]?.empty) return;
+    const g = sc.getContext('2d'); g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, 34, 34);
     drawTile(g, i, 0, 0, 34, 34);
   });
 }
 function refreshPalSel() {
   document.querySelectorAll('#swatches .swatch').forEach(el => {
-    const isEr = el.classList.contains('eraser');
-    el.classList.toggle('sel', isEr ? curTile === -1 : +el.dataset.i === curTile);
+    el.classList.toggle('sel', +el.dataset.i === curTile);
   });
+  $('tileErase').classList.toggle('active', curTile === -1);
+}
+function autotileGroupForTile(index) {
+  const ch = tileset.defs[index]?.ch;
+  return autotileGroups.findIndex(group => group.variants.includes(ch));
+}
+function createAutotileFromSelection(mode) {
+  const size = mode === 'bitmask' ? 4 : 3;
+  const base = curTile;
+  const baseCol = base % tileset.tilesPerRow;
+  const baseRow = Math.floor(base / tileset.tilesPerRow);
+  const totalRows = Math.ceil(tileset.defs.length / tileset.tilesPerRow);
+  if (baseCol + size > tileset.tilesPerRow || baseRow + size > totalRows) {
+    status('<span class="err">A complete ' + size + '×' + size + ' block does not fit from this tile. Select its top-left cell.</span>');
+    return;
+  }
+  const indices = [];
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    indices.push(base + y * tileset.tilesPerRow + x);
+  }
+  if (indices.some(index => !tileset.defs[index] || tileset.defs[index].empty)) {
+    status('<span class="err">This block contains empty cells. Select the top-left cell of a complete ' + size + '×' + size + ' variant block.</span>');
+    return;
+  }
+  const variants = indices.map(index => tileset.defs[index].ch);
+  autotileGroups = autotileGroups.filter(group => !group.variants.some(ch => variants.includes(ch)));
+  autotileGroups.push({
+    name: (tileset.defs[base].name || 'Terrain') + ' ' + (mode === 'bitmask' ? 'bitmask' : 'terrain'),
+    mode,
+    variants
+  });
+  curAutoTile = autotileGroups.length - 1;
+  curStamp = null;
+  buildInspector();
+  status('<span class="ok">' + (mode === 'bitmask' ? '4×4 bitmask' : '3×3 terrain') + ' brush created and activated.</span>');
 }
 function buildInspector() {
   const box = $('tileInspector');
   if (activeLayer === 'events') { box.innerHTML = ''; return; }
   if (curTile === -1) { box.innerHTML = '<div class="insp"><b>Eraser</b>&nbsp;<span class="hint">clears tiles on this layer</span></div>'; return; }
   const d = tileset.defs[curTile]; if (!d) { box.innerHTML = ''; return; }
+  const groupIndex = autotileGroupForTile(curTile);
+  const autoActive = groupIndex >= 0 && curAutoTile === groupIndex;
+  const autoTools = groupIndex >= 0
+    ? '<div class="autotile-tools"><button id="iAutoToggle" class="' + (autoActive ? 'active' : '') + '">' +
+      (autoActive ? 'Auto brush: on' : 'Use auto brush') + '</button><button id="iAutoRemove">Forget auto group</button>' +
+      '<span class="autotile-hint">Connected cells update their edge variant while you paint.</span></div>'
+    : '<div class="autotile-tools"><button id="iAuto3">3×3 terrain from here</button><button id="iAuto4">4×4 bitmask from here</button>' +
+      '<span class="autotile-hint">Select the top-left tile of an ordered variant block. 3×3 uses corners/edges/center; 4×4 uses N/E/S/W masks 0–15.</span></div>';
   box.innerHTML =
     '<div class="insp"><canvas class="ipreview" width="46" height="46"></canvas>' +
     '<div class="ifields">' +
@@ -426,7 +542,8 @@ function buildInspector() {
     '<div class="flags"><span class="chip solid' + (d.solid ? ' on' : '') + '">solid</span>' +
     '<span class="chip canopy' + (d.canopy ? ' on' : '') + '">canopy</span></div>' +
     '</div></div>' +
-    '<div class="palpick"><label>Palette</label><div class="palramps" id="palRamps"></div></div>';
+    '<div class="palpick"><label>Palette</label><div class="palramps" id="palRamps"></div></div>' +
+    autoTools;
   const pv = box.querySelector('.ipreview').getContext('2d'); pv.imageSmoothingEnabled = false;
   if (tilesReady) drawTile(pv, curTile, 0, 0, 46, 46);
   const iCh = box.querySelector('#iCh'), iName = box.querySelector('#iName');
@@ -454,6 +571,19 @@ function buildInspector() {
     el.onclick = () => { d.pal = pi; buildTileCache(); draw(); drawSwatches(); buildInspector(); };
     rr.appendChild(el);
   });
+  if (groupIndex >= 0) {
+    box.querySelector('#iAutoToggle').onclick = () => {
+      curAutoTile = curAutoTile === groupIndex ? null : groupIndex;
+      curStamp = null; buildInspector();
+    };
+    box.querySelector('#iAutoRemove').onclick = () => {
+      autotileGroups.splice(groupIndex, 1); curAutoTile = null; buildInspector();
+      status('Auto-tile group removed. The source tiles remain unchanged.');
+    };
+  } else {
+    box.querySelector('#iAuto3').onclick = () => createAutotileFromSelection('nine-slice');
+    box.querySelector('#iAuto4').onclick = () => createAutotileFromSelection('bitmask');
+  }
 }
 function refreshTitles() {
   document.querySelectorAll('#swatches canvas[data-i]').forEach(sc => {
@@ -546,6 +676,34 @@ function undo() {
 }
 
 let painting = false, lastCell = null;
+function autotileVariant(group, mask) {
+  if (group.mode === 'bitmask') return group.variants[mask] || group.variants[0];
+  const n = !!(mask & 1), e = !!(mask & 2), s = !!(mask & 4), w = !!(mask & 8);
+  const v = group.variants;
+  if (!n && !e && !s && !w) return v[4];
+  if (!n && !w) return v[0];
+  if (!n && !e) return v[2];
+  if (!s && !w) return v[6];
+  if (!s && !e) return v[8];
+  if (!n) return v[1];
+  if (!w) return v[3];
+  if (!e) return v[5];
+  if (!s) return v[7];
+  return v[4];
+}
+function refreshAutotileCell(lay, x, y, group) {
+  if (x < 0 || y < 0 || x >= cols || y >= rows) return;
+  if (!group.variants.includes(lay[y][x])) return;
+  const connected = (nx, ny) => nx >= 0 && ny >= 0 && nx < cols && ny < rows && group.variants.includes(lay[ny][nx]);
+  const mask = (connected(x, y - 1) ? 1 : 0) | (connected(x + 1, y) ? 2 : 0) |
+    (connected(x, y + 1) ? 4 : 0) | (connected(x - 1, y) ? 8 : 0);
+  lay[y][x] = autotileVariant(group, mask);
+}
+function refreshAutotileAround(lay, x, y, group) {
+  [[x, y], [x, y - 1], [x + 1, y], [x, y + 1], [x - 1, y]].forEach(([tx, ty]) => {
+    refreshAutotileCell(lay, tx, ty, group);
+  });
+}
 function paintCell(cell) {
   if (activeLayer === 'events') return;
   const lay = layers[activeLayer];
@@ -558,9 +716,20 @@ function paintCell(cell) {
     requestDraw(); return;
   }
   if (curTile < 0 || !tileset.defs[curTile]) { if (curTile !== -1) return; }
+  const previous = lay[cell.y][cell.x];
+  const previousGroups = autotileGroups.filter(group => group.variants.includes(previous));
+  if (curAutoTile != null && autotileGroups[curAutoTile]) {
+    const group = autotileGroups[curAutoTile];
+    lay[cell.y][cell.x] = group.mode === 'bitmask' ? group.variants[0] : group.variants[4];
+    previousGroups.filter(other => other !== group).forEach(other => refreshAutotileAround(lay, cell.x, cell.y, other));
+    refreshAutotileAround(lay, cell.x, cell.y, group);
+    requestDraw(); return;
+  }
   const val = curTile === -1 ? (activeLayer === 0 ? '.' : null) : tileset.defs[curTile].ch;
   if (lay[cell.y][cell.x] === val) return;
-  lay[cell.y][cell.x] = val; requestDraw();
+  lay[cell.y][cell.x] = val;
+  previousGroups.forEach(group => refreshAutotileAround(lay, cell.x, cell.y, group));
+  requestDraw();
 }
 function placeMarker(cell) {
   if (!curMarker) { status('Select a marker in the sidebar first.'); return; }
@@ -578,7 +747,9 @@ cv.addEventListener('mousedown', e => {
     if (activeLayer !== 'events') {
       const ch = layers[activeLayer][cell.y][cell.x];
       if (ch != null && chToIdx[ch] != null) {
-        curTile = chToIdx[ch]; tilePage = Math.floor(curTile / TILE_PAGE_SIZE); curStamp = null;
+        curTile = chToIdx[ch]; tilePage = pageForTile(curTile); curStamp = null;
+        const groupIndex = autotileGroupForTile(curTile);
+        curAutoTile = groupIndex >= 0 ? groupIndex : null;
         buildPalette(); status('Eyedropper: ' + (tileset.defs[curTile].name || ch));
       }
     }
@@ -699,10 +870,11 @@ function buildJSON() {
     tileSize: SRC,
     size: { cols, rows },
     palettes: palettes.map(p => ({ name: p.name, colors: p.hex.slice() })),
-    tiles: tileset.defs.map((d, i) => ({ index: i, char: d.ch, name: d.name, solid: !!d.solid, canopy: !!d.canopy, palette: d.pal ?? 0 })),
+    tiles: tileset.defs.map((d, i) => ({ index: i, char: d.ch, name: d.name, solid: !!d.solid, canopy: !!d.canopy, palette: d.pal ?? 0, empty: !!d.empty })),
     layers: { ground: layers[0].map(rowToStr), object1: layers[1].map(rowToStr), object2: layers[2].map(rowToStr), flat: flatten() },
     tileset: { columns: tileset.tilesPerRow, tileSize: SRC, image: tilesetDataURL() },
     baked,
+    autotiles: autotileGroups.map(group => ({ name: group.name, mode: group.mode, variants: group.variants.slice() })),
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, w: o.tw * SRC, h: o.th * SRC, tilesW: o.tw, tilesH: o.th, console: o.console, image: o.imgSrc || null })),
     markers: Object.fromEntries(markerOrder.filter(n => markers[n]).map(n => [n, markers[n]]))
   };
@@ -767,6 +939,7 @@ function loadTilesetFromImage(img, tileSize) {
     return;
   }
   setTileSize(tileSize);
+  const analysis = analyzeTilesetImage(img, tileSize, tpr, count);
   const defs = [];
   const usedChars = new Set();
   let charCursor = 0;
@@ -779,16 +952,23 @@ function loadTilesetFromImage(img, tileSize) {
   };
   for (let i = 0; i < count; i++) {
     const old = tileset.defs[i];
+    const tileInfo = analysis[i];
     if (old && old.ch && !usedChars.has(old.ch)) {
       usedChars.add(old.ch);
-      defs.push({ ...old });
+      defs.push({ ...old, pal: tileInfo.pal, empty: tileInfo.empty });
     } else {
-      defs.push({ ch: allocateChar(), name: 'Tile ' + i, solid: false, canopy: false, pal: 7 });
+      defs.push({
+        ch: allocateChar(), name: tileInfo.empty ? 'Empty cell' : 'Tile ' + i,
+        solid: false, canopy: false, pal: tileInfo.pal, empty: tileInfo.empty
+      });
     }
   }
   tileset = { img, tilesPerRow: tpr, count, defs };
+  autotileGroups = []; curAutoTile = null;
+  const visible = analysis.filter(tile => !tile.empty).length;
   tilesReady = true; tilePage = 0; rebuildChMap(); buildTileCache(); syncSize();
-  status('<span class="ok">Imported ' + count + ' tiles at ' + tileSize + '×' + tileSize + 'px (' + tpr + ' columns × ' + tRows + ' rows).</span>');
+  status('<span class="ok">Imported ' + visible + ' visible tiles at ' + tileSize + '×' + tileSize +
+    'px in their original ' + tpr + '×' + tRows + ' sheet layout. Palettes were matched automatically.</span>');
   buildPalette();
 }
 $('fileInput').onchange = e => {
@@ -837,6 +1017,7 @@ function saveRoom() {
     layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
+    autotileGroups: autotileGroups.map(group => ({ ...group, variants: group.variants.slice() })),
     palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
     curPreset, invert,
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
@@ -877,6 +1058,11 @@ function loadRoom(name, d) {
     tileset.defs = d.defs.map(x => ({ ...x, name: LEGACY_TILE_NAMES[x.name] || x.name }));
     tileset.tilesPerRow = d.tilesPerRow || 12;
   }
+  const validChars = new Set(tileset.defs.map(def => def.ch));
+  autotileGroups = (d.autotileGroups || []).filter(group =>
+    Array.isArray(group.variants) && group.variants.length && group.variants.every(ch => validChars.has(ch))
+  ).map(group => ({ ...group, variants: group.variants.slice() }));
+  curAutoTile = null;
   if (d.palettes) palettes = d.palettes.map(p => ({
     name: LEGACY_PALETTE_NAMES[p.name] || p.name,
     hex: p.hex.slice(),
@@ -901,6 +1087,7 @@ function buildProject() {
     layers: layers.map(l => l.map(r => r.map(ch => ch == null ? ' ' : ch).join(''))),
     markers, markerOrder,
     defs: tileset.defs, tilesPerRow: tileset.tilesPerRow,
+    autotileGroups: autotileGroups.map(group => ({ ...group, variants: group.variants.slice() })),
     palettes: palettes.map(p => ({ name: p.name, hex: p.hex })),
     objects: objects.map(o => ({ name: o.name, x: o.x, y: o.y, tw: o.tw, th: o.th, console: o.console, imgSrc: o.imgSrc })),
     tilesSrc: tileset.img.toDataURL ? tileset.img.toDataURL('image/png') : (tileset.img.src && tileset.img.src.startsWith('data:') ? tileset.img.src : null),
@@ -1043,7 +1230,7 @@ function sheetCell(e) {
 function commitSingleTile(cell) {
   const idx = addTileFromRegion(sheetData, sheetW, cell.x * SRC, cell.y * SRC, transpRgbOrNull());
   if (idx == null) { status('This cell is empty or transparent.'); return; }
-  tilesReady = true; buildTileCache(); curTile = idx; tilePage = Math.floor(idx / TILE_PAGE_SIZE); curStamp = null;
+  tilesReady = true; buildTileCache(); curTile = idx; tilePage = pageForTile(idx); curStamp = null; curAutoTile = null;
   buildPalette(); refreshPalSel(); draw();
   status('<span class="ok">Added tile #' + idx + '.</span>');
 }
@@ -1191,9 +1378,15 @@ $('projFile').onchange = e => { const f = e.target.files[0]; if (f) importProjec
 $('btnCheck').onclick = checkBorder;
 $('btnExport').onclick = openExport;
 $('btnUpload').onclick = () => $('fileInput').click();
+$('btnAutoPalette').onclick = () => autoAssignPalettes(true);
+$('tileErase').onclick = () => {
+  if (activeLayer === 0) return;
+  curTile = -1; curStamp = null; curAutoTile = null; refreshPalSel(); buildInspector();
+};
 $('tilePrev').onclick = () => { if (tilePage > 0) { tilePage--; buildPalette(); } };
 $('tileNext').onclick = () => {
-  if ((tilePage + 1) * TILE_PAGE_SIZE < tileset.defs.length) { tilePage++; buildPalette(); }
+  const info = tilePageMetrics();
+  if (tilePage < info.pages - 1) { tilePage++; buildPalette(); }
 };
 $('btnAddObject').onclick = () => $('objFile').click();
 $('btnSheet').onclick = openSheetDlg;

@@ -19,7 +19,10 @@ Double-click `index.html`, or host the three files on any static web server.
 
 - 8×8, 16×16, and 32×32 tileset imports
 - Three tile layers (Ground, Object 1, Object 2) and an Events layer
-- Responsive RPG Maker-style tile grid with pagination for large tilesets
+- RPG Maker-style tile grid that preserves source rows and transparent gaps
+- Automatic nearest-palette matching for imported tiles
+- Reusable 3×3 terrain and 4×4 bitmask auto-tile brushes
+- Row-aligned pagination for large tilesets
 - Resizable left sidebar; its width is remembered in the browser
 - Eight editable four-color palette slots with live console-style recoloring
 - Importable objects and sprites with common GB/GBA/SNES/NES/Mega Drive sizes

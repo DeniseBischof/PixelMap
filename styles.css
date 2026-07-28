@@ -76,7 +76,8 @@
   /* Tiles — Raster-Palette wie RPG Maker */
   #swatches {
     display: grid; grid-template-columns: repeat(auto-fill, 34px); gap: 4px;
-    align-items: start; justify-content: start;
+    align-items: start; justify-content: start; max-width: 100%; overflow-x: auto;
+    padding: 1px 1px 6px; scrollbar-width: thin;
   }
   .swatch {
     width: 34px; height: 34px; border-radius: 4px; border: 2px solid transparent;
@@ -86,6 +87,10 @@
   .swatch:hover { border-color: #ffffff40; }
   .swatch.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .swatch.eraser { background: repeating-conic-gradient(#3d4030 0% 25%, #24271d 0% 50%) 0 / 12px 12px; }
+  .swatch.empty {
+    cursor: default; opacity: .36; border: 1px dashed #ffffff25;
+    background: repeating-conic-gradient(#2b2e21 0% 25%, #202219 0% 50%) 0 / 8px 8px;
+  }
   .tile-pager {
     min-height: 29px; margin: -2px 0 7px; padding: 3px 5px;
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -95,6 +100,7 @@
   .pager-actions { display: flex; gap: 3px; }
   .pager-actions button { width: 27px; height: 23px; padding: 0; font-size: 16px; line-height: 1; }
   .pager-actions button:disabled { opacity: .35; cursor: default; }
+  #tileErase.active { color: var(--accent); border-color: var(--accent); background: #ffffff12; }
   .tileset-import {
     display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center;
     margin-top: 8px;
@@ -102,6 +108,7 @@
   .tileset-import .field { min-width: 0; }
   .tileset-import select { min-width: 72px; }
   .tileset-import button { min-width: 0; }
+  .tileset-import .wide { grid-column: 1 / -1; }
 
   /* Tile-Inspektor unter der Palette */
   #tileInspector { margin-top: 8px; }
@@ -124,6 +131,13 @@
   .ramp i { flex: 1; }
   .ramp:hover { border-color: #ffffff55; }
   .ramp.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .autotile-tools {
+    margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 5px;
+  }
+  .autotile-tools button { flex: 1 1 auto; padding: 4px 7px; font-size: 10px; }
+  .autotile-tools button.active { background: #46644a; border-color: var(--accent); }
+  .autotile-hint { flex-basis: 100%; color: var(--muted); font-size: 10px; line-height: 1.35; }
 
   /* Markers / events */
   .marker-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: pointer; }

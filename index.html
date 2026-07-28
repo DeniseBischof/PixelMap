@@ -48,6 +48,7 @@
     <div id="tilePager" class="tile-pager" aria-label="Tile palette navigation">
       <span id="tileRange">0 tiles</span>
       <span class="pager-actions">
+        <button id="tileErase" type="button" title="Eraser" aria-label="Eraser">⌫</button>
         <button id="tilePrev" type="button" title="Previous tiles" aria-label="Previous tiles">‹</button>
         <button id="tileNext" type="button" title="Next tiles" aria-label="Next tiles">›</button>
       </span>
@@ -63,10 +64,11 @@
         </select>
       </label>
       <button id="btnUpload">Import tileset PNG</button>
+      <button id="btnAutoPalette" class="wide" title="Match every visible tile to the closest available palette">Auto-match palettes</button>
     </div>
     <input type="file" id="fileInput" accept="image/png,image/*" style="display:none">
     <button id="btnSheet" style="width:100%;margin-top:4px">Open sheet — select a region</button>
-    <div class="hint" style="margin-top:6px">Tileset PNGs are sliced using the selected tile size. Use Sheet mode to pick cells, stamps, or objects from a larger image.</div>
+    <div class="hint" style="margin-top:6px">Tileset PNGs keep their original row layout and transparent cells remain empty. Use Sheet mode to pick cells, stamps, or objects from a larger image.</div>
 
     <div id="eventPanel" style="display:none">
       <div class="section-title">Objects (sprites)</div>
